@@ -151,6 +151,19 @@ StringTokenizer st1 = new StringTokenizer(tmpCols.substring(1), delim);
 
                       } else if (colType.equals("date")){
 
+                            System.out.println("reaced date");
+                            System.out.println(colVal);
+                            colVal = colVal.substring(1,10);
+                            String[] yyyymmdd_arr = colVal.split("-");
+                            if( yyyymmdd_arr.length != 3 ){ {if ("" != null) return true;} }
+                                for(int k = 0 ; k < 3 ; k ++ ){
+                                    try {
+                                            Integer.parseInt(yyyymmdd_arr[k]); }
+                                            catch (NumberFormatException e ){
+                                            {if ("" != null) return true;}
+                                    }
+                                }
+
                       } else if (colType.startsWith("char(")){
                         if (!colVal.startsWith("'") || !colVal.endsWith("'")){
                               {if ("" != null) return true;}
@@ -1772,54 +1785,6 @@ System.out.println("Syntax error");
     finally { jj_save(8, xla); }
   }
 
-  private boolean jj_3R_52()
- {
-    if (jj_scan_token(LEFT_PAREN)) return true;
-    if (jj_3R_27()) return true;
-    if (jj_scan_token(RIGHT_PAREN)) return true;
-    return false;
-  }
-
-  private boolean jj_3R_50()
- {
-    if (jj_3R_52()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_22()
- {
-    if (jj_scan_token(LEGAL_IDENTIFIER)) return true;
-    return false;
-  }
-
-  private boolean jj_3R_49()
- {
-    if (jj_3R_51()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_48()
- {
-    Token xsp;
-    xsp = jj_scanpos;
-    if (jj_3R_49()) {
-    jj_scanpos = xsp;
-    if (jj_3R_50()) return true;
-    }
-    return false;
-  }
-
-  private boolean jj_3R_11()
- {
-    Token xsp;
-    xsp = jj_scanpos;
-    if (jj_3R_22()) {
-    jj_scanpos = xsp;
-    if (jj_scan_token(19)) return true;
-    }
-    return false;
-  }
-
   private boolean jj_3R_43()
  {
     if (jj_scan_token(NOT)) return true;
@@ -2232,6 +2197,54 @@ System.out.println("Syntax error");
   private boolean jj_3_2()
  {
     if (jj_3R_13()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_52()
+ {
+    if (jj_scan_token(LEFT_PAREN)) return true;
+    if (jj_3R_27()) return true;
+    if (jj_scan_token(RIGHT_PAREN)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_50()
+ {
+    if (jj_3R_52()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_22()
+ {
+    if (jj_scan_token(LEGAL_IDENTIFIER)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_49()
+ {
+    if (jj_3R_51()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_48()
+ {
+    Token xsp;
+    xsp = jj_scanpos;
+    if (jj_3R_49()) {
+    jj_scanpos = xsp;
+    if (jj_3R_50()) return true;
+    }
+    return false;
+  }
+
+  private boolean jj_3R_11()
+ {
+    Token xsp;
+    xsp = jj_scanpos;
+    if (jj_3R_22()) {
+    jj_scanpos = xsp;
+    if (jj_scan_token(19)) return true;
+    }
     return false;
   }
 
