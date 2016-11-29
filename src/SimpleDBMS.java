@@ -94,9 +94,19 @@ public class SimpleDBMS implements SimpleDBMSConstants {
     handleSyntaxError(parser);
   }
 
-// Checking Functions// Get column definition from DB and check duplicate columns  final public 
+// Checking Functions// Get column definition from DB and check duplicate columns
+//COME BACK  final public String CheckInsertColumnNonNullable(String tblName) throws ParseException {
+String colValStr = myDB.getDB(tblName + " @tmptuple").elementAt(0);
 
-String CheckInsertColumnExistence(String tblName) throws ParseException {
+        // tblName의 column definition을 돌면서 not nullable이 있는 경우
+        // 두 가지 조건을 만족해야한다
+        // tmpCol에 그 column이 있는지
+        // 그 column의 value 가 "null"이 아닌지
+        {if ("" != null) return colValStr;}
+    throw new Error("Missing return statement in function");
+  }
+
+  final public String CheckInsertColumnExistence(String tblName) throws ParseException {
 // tmpCols =>분리 & tblNAm @colDef의 Value가 포함하고있나?
         Vector<String> colNames = new Vector<String>();
         String colDef = myDB.getDB(tblName + " @column definition").elementAt(0);
@@ -129,7 +139,7 @@ String CheckInsertColumnExistence(String tblName) throws ParseException {
   final public boolean CheckInsertTypeMismatch(String tblName) throws ParseException {
 StringTokenizer st1 = new StringTokenizer(tmpCols.substring(1), delim);
       StringTokenizer st2 = new StringTokenizer(tmpVals.substring(1), delim);
-
+      String tupleInput = "";
       if(st1.countTokens() != st2.countTokens() ){
         {if ("" != null) return true;}
       }
@@ -139,7 +149,7 @@ StringTokenizer st1 = new StringTokenizer(tmpCols.substring(1), delim);
                     String colName = st1.nextToken();
                     String colVal = st2.nextToken();
                     String colType = GetColumnType(tblName, colName);
-
+                      if(colVal.equals("null")){ continue; }
                       if(colType.equals("int")){
                            try {
                                 Integer.parseInt(colVal); }
@@ -151,9 +161,6 @@ StringTokenizer st1 = new StringTokenizer(tmpCols.substring(1), delim);
 
                       } else if (colType.equals("date")){
 
-                            System.out.println("reaced date");
-                            System.out.println(colVal);
-                            colVal = colVal.substring(1,10);
                             String[] yyyymmdd_arr = colVal.split("-");
                             if( yyyymmdd_arr.length != 3 ){ {if ("" != null) return true;} }
                                 for(int k = 0 ; k < 3 ; k ++ ){
@@ -167,12 +174,20 @@ StringTokenizer st1 = new StringTokenizer(tmpCols.substring(1), delim);
                       } else if (colType.startsWith("char(")){
                         if (!colVal.startsWith("'") || !colVal.endsWith("'")){
                               {if ("" != null) return true;}
+                          } else {
+                            String lengthOfChar = colType.substring(5,colType.length()-1);
+                                                         int lengthOfChar_int = Integer.parseInt(lengthOfChar);
+                                                         if(colVal.length() > lengthOfChar_int+ 2)
+                                                         { colVal = colVal.substring(0, Integer.parseInt(lengthOfChar)+1) + "'"; }
                           }
                       } else {
                         {if ("" != null) return true;}
                       }
-                  }
 
+                 tupleInput += "|"+colName+"|"+colVal;
+                }
+
+          myDB.putDB(tblName + " @tmptuple", tupleInput.substring(1));
      {if ("" != null) return false;}
     throw new Error("Missing return statement in function");
   }
@@ -832,6 +847,8 @@ Success(i);
     jj_consume_token(EXIT);
 System.out.println(tmpCols); // FIX NEEDED
     System.out.println(tmpVals);
+    String colValStr = myDB.getDB("account" + " @tmptuple").elementAt(0);
+    System.out.println(" coValStr: "+colValStr);
     {if ("" != null) return - 1;}
     throw new Error("Missing return statement in function");
   }
@@ -1568,13 +1585,9 @@ if (CheckNoSuchTable(tblName))
     if ( (CheckInsertTypeMismatch(tblName))){
             InsertTypeMismatchError();
     }
-
-
-
-    // 2) CheckInsertTypeMismatch
     // 3) CheckInsertColumnNonNullable
     // 4) CheckInsertDuplicatePrimaryKey
-    // 5) CheckInsertReferentialIntegrity
+    // 5) CheckInsㅏertReferentialIntegrity
 
     {if ("" != null) return 5;}
     throw new Error("Missing return statement in function");
@@ -1783,72 +1796,6 @@ System.out.println("Syntax error");
     try { return !jj_3_9(); }
     catch(LookaheadSuccess ls) { return true; }
     finally { jj_save(8, xla); }
-  }
-
-  private boolean jj_3R_43()
- {
-    if (jj_scan_token(NOT)) return true;
-    if (jj_3R_48()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_42()
- {
-    if (jj_3R_48()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_39()
- {
-    Token xsp;
-    xsp = jj_scanpos;
-    if (jj_3R_42()) {
-    jj_scanpos = xsp;
-    if (jj_3R_43()) return true;
-    }
-    return false;
-  }
-
-  private boolean jj_3R_40()
- {
-    if (jj_scan_token(AND)) return true;
-    if (jj_3R_39()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_32()
- {
-    if (jj_3R_39()) return true;
-    Token xsp;
-    while (true) {
-      xsp = jj_scanpos;
-      if (jj_3R_40()) { jj_scanpos = xsp; break; }
-    }
-    return false;
-  }
-
-  private boolean jj_3R_28()
- {
-    if (jj_scan_token(LEGAL_IDENTIFIER)) return true;
-    return false;
-  }
-
-  private boolean jj_3R_33()
- {
-    if (jj_scan_token(OR)) return true;
-    if (jj_3R_32()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_18()
- {
-    Token xsp;
-    xsp = jj_scanpos;
-    if (jj_3R_28()) {
-    jj_scanpos = xsp;
-    if (jj_scan_token(19)) return true;
-    }
-    return false;
   }
 
   private boolean jj_3R_27()
@@ -2242,6 +2189,72 @@ System.out.println("Syntax error");
     Token xsp;
     xsp = jj_scanpos;
     if (jj_3R_22()) {
+    jj_scanpos = xsp;
+    if (jj_scan_token(19)) return true;
+    }
+    return false;
+  }
+
+  private boolean jj_3R_43()
+ {
+    if (jj_scan_token(NOT)) return true;
+    if (jj_3R_48()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_42()
+ {
+    if (jj_3R_48()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_39()
+ {
+    Token xsp;
+    xsp = jj_scanpos;
+    if (jj_3R_42()) {
+    jj_scanpos = xsp;
+    if (jj_3R_43()) return true;
+    }
+    return false;
+  }
+
+  private boolean jj_3R_40()
+ {
+    if (jj_scan_token(AND)) return true;
+    if (jj_3R_39()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_32()
+ {
+    if (jj_3R_39()) return true;
+    Token xsp;
+    while (true) {
+      xsp = jj_scanpos;
+      if (jj_3R_40()) { jj_scanpos = xsp; break; }
+    }
+    return false;
+  }
+
+  private boolean jj_3R_28()
+ {
+    if (jj_scan_token(LEGAL_IDENTIFIER)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_33()
+ {
+    if (jj_scan_token(OR)) return true;
+    if (jj_3R_32()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_18()
+ {
+    Token xsp;
+    xsp = jj_scanpos;
+    if (jj_3R_28()) {
     jj_scanpos = xsp;
     if (jj_scan_token(19)) return true;
     }
