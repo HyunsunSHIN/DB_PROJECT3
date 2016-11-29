@@ -97,7 +97,33 @@ public class SimpleDBMS implements SimpleDBMSConstants {
   }
 
 // Checking Functions// Get column definition from DB and check duplicate columns  final public 
-String CheckInsertColumnNonNullable(String tblName) throws ParseException {
+boolean CheckInsertDuplicatePrimaryKeyError(String tblName) throws ParseException {
+String tupleString_input = myDB.getDB(tblName + " @tmptuple").elementAt(0);
+         String PriKeys = myDB.getDB(tblName + " @primary key").elementAt(0);
+        Vector<String> tuples = myDB.getDB(tblName+ " @tuple");
+
+         if(tuples.size() == 0 ){ {if ("" != null) return false;}}
+         for(int i = 0 ; i < tuples.size() ; i ++ ){
+
+             StringTokenizer st = new StringTokenizer(PriKeys, delim);
+             String tupleString = tuples.elementAt(i);
+
+             boolean duplication_occur = true;
+
+             while(st.hasMoreTokens()){
+                String PriKey = st.nextToken();
+                String Value = GetColumnValue(tupleString,PriKey);
+                String Value_input = GetColumnValue(tupleString_input,PriKey);
+
+                if(!Value.equals(Value_input)){ duplication_occur= false; break;  }
+             }
+             if( duplication_occur){ {if ("" != null) return true;} }
+         }
+     {if ("" != null) return false;}
+    throw new Error("Missing return statement in function");
+  }
+
+  final public String CheckInsertColumnNonNullable(String tblName) throws ParseException {
 addNullExiplicitly(tblName);
         String tupleToCheck = myDB.getDB(tblName + " @tmptuple").elementAt(0);
         StringTokenizer st = new StringTokenizer(tupleToCheck, delim);
@@ -505,13 +531,18 @@ Vector<String> tblNames = myDB.getDB("@table name");
   }
 
 // Error Functions  final public 
-void InsertColumnNonNullableError(String colName) throws ParseException {
+void InsertDuplicatePrimaryKeyError() throws ParseException {
+System.out.println("Insertion has failed: Primary key duplication");
+        handleDBError(parser);
+  }
+
+  final public void InsertColumnNonNullableError(String colName) throws ParseException {
 System.out.println("Insertion has failed: '"+colName+"' is not nullable");
     handleDBError(parser);
   }
 
   final public void InsertTypeMismatchError() throws ParseException {
-System.out.println("Insertion has failed: Types are not matched");
+System.out.println("Insertion has failed: Primary key duplication");
     handleDBError(parser);
   }
 
@@ -588,8 +619,21 @@ System.out.println("There is no table");
   }
 
 // Utility Functions  final public 
+String GetColumnValue(String tupleString, String colName) throws ParseException {
+StringTokenizer st =  new StringTokenizer(tupleString, delim);
+         while (st.hasMoreTokens())
+                    {
+                      String col_name = st.nextToken();
+                      String col_val = st.nextToken();
+                      if(col_name.equals(colName)){
+                        {if ("" != null) return col_val;}
+                      }
+                    }
+      {if ("" != null) return null;}
+    throw new Error("Missing return statement in function");
+  }
 
-void addNullExiplicitly(String tblName) throws ParseException {
+  final public void addNullExiplicitly(String tblName) throws ParseException {
 String colValStr = myDB.getDB(tblName + " @tmptuple").elementAt(0);
 
             StringTokenizer st1 = new StringTokenizer(colValStr, delim);
@@ -911,8 +955,8 @@ Success(i);
 
   final public int ExitQuery() throws ParseException {
     jj_consume_token(EXIT);
-String tupleResult = myDB.getDB("account @tuple").elementAt(0);
-    System.out.println("tuple inserted:"+tupleResult);
+String result = myDB.getDB("account @primary key").elementAt(0);
+    System.out.println(result);
     {if ("" != null) return - 1;}
     throw new Error("Missing return statement in function");
   }
@@ -958,6 +1002,7 @@ myDB.putDB(tblName + " @column definition", tmpColDef.substring(1));
     {
       ReferenceTypeError(tblName);
     }
+
     ChangeToNotNull(tblName);
     createTblName = tblName;
     myDB.putDB("@table name", tblName);
@@ -1635,7 +1680,7 @@ if (CheckNoSuchTable(tblName))
     jj_consume_token(INSERT_INTO);
     tblName = TableName();
     InsertColumnsAndSource();
-// myDB.putDB(tblName + " @tuple", tmpColDef.substring(1));
+myDB.deleteDB(tblName+" @tmptuple"); // 에러가 났을 경우 아직도 남아있을 수 있기 때문에..
     if (!CheckTableExistence(tblName))
         {
           NoSuchTable();
@@ -1653,11 +1698,16 @@ if (CheckNoSuchTable(tblName))
     if ( (colName = CheckInsertColumnNonNullable(tblName))!= null){
             InsertColumnNonNullableError(colName);
     }
-    // 3) CheckInsertColumnNonNullable
-    // 4) CheckInsertDuplicatePrimaryKey
-    // 5) CheckInsㅏertReferentialIntegrity
 
-    {if ("" != null) return 5;}
+
+    if ( CheckInsertDuplicatePrimaryKeyError(tblName)){
+        InsertDuplicatePrimaryKeyError();
+    }
+
+    // 4) CheckInsertDuplicatePrimaryKey
+    // 5) CheckInsertReferentialIntegrity
+   myDB.putDB(tblName + " @tuple", myDB.getDB(tblName+" @tmptuple").elementAt(0));
+   {if ("" != null) return 5;}
     throw new Error("Missing return statement in function");
   }
 
@@ -1864,6 +1914,161 @@ System.out.println("Syntax error");
     try { return !jj_3_9(); }
     catch(LookaheadSuccess ls) { return true; }
     finally { jj_save(8, xla); }
+  }
+
+  private boolean jj_3R_35()
+ {
+    if (jj_3R_11()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_15()
+ {
+    if (jj_3R_11()) return true;
+    if (jj_scan_token(AS)) return true;
+    if (jj_3R_11()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_29()
+ {
+    Token xsp;
+    xsp = jj_scanpos;
+    if (jj_3R_34()) {
+    jj_scanpos = xsp;
+    if (jj_3R_35()) {
+    jj_scanpos = xsp;
+    if (jj_3R_36()) return true;
+    }
+    }
+    return false;
+  }
+
+  private boolean jj_3R_34()
+ {
+    if (jj_3R_20()) return true;
+    return false;
+  }
+
+  private boolean jj_3_7()
+ {
+    if (jj_3R_19()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_14()
+ {
+    if (jj_3R_18()) return true;
+    if (jj_scan_token(PERIOD)) return true;
+    if (jj_3R_11()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_19()
+ {
+    if (jj_3R_29()) return true;
+    if (jj_scan_token(COMP_OP)) return true;
+    if (jj_3R_29()) return true;
+    return false;
+  }
+
+  private boolean jj_3_4()
+ {
+    if (jj_3R_15()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_54()
+ {
+    if (jj_3R_55()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_13()
+ {
+    if (jj_3R_18()) return true;
+    if (jj_scan_token(PERIOD)) return true;
+    if (jj_3R_11()) return true;
+    if (jj_scan_token(AS)) return true;
+    if (jj_3R_11()) return true;
+    return false;
+  }
+
+  private boolean jj_3_3()
+ {
+    if (jj_3R_14()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_53()
+ {
+    if (jj_3R_19()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_51()
+ {
+    Token xsp;
+    xsp = jj_scanpos;
+    if (jj_3R_53()) {
+    jj_scanpos = xsp;
+    if (jj_3R_54()) return true;
+    }
+    return false;
+  }
+
+  private boolean jj_3_2()
+ {
+    if (jj_3R_13()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_52()
+ {
+    if (jj_scan_token(LEFT_PAREN)) return true;
+    if (jj_3R_27()) return true;
+    if (jj_scan_token(RIGHT_PAREN)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_50()
+ {
+    if (jj_3R_52()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_22()
+ {
+    if (jj_scan_token(LEGAL_IDENTIFIER)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_49()
+ {
+    if (jj_3R_51()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_48()
+ {
+    Token xsp;
+    xsp = jj_scanpos;
+    if (jj_3R_49()) {
+    jj_scanpos = xsp;
+    if (jj_3R_50()) return true;
+    }
+    return false;
+  }
+
+  private boolean jj_3R_11()
+ {
+    Token xsp;
+    xsp = jj_scanpos;
+    if (jj_3R_22()) {
+    jj_scanpos = xsp;
+    if (jj_scan_token(19)) return true;
+    }
+    return false;
   }
 
   private boolean jj_3R_43()
@@ -2171,161 +2376,6 @@ System.out.println("Syntax error");
   private boolean jj_3R_36()
  {
     if (jj_3R_41()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_35()
- {
-    if (jj_3R_11()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_15()
- {
-    if (jj_3R_11()) return true;
-    if (jj_scan_token(AS)) return true;
-    if (jj_3R_11()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_29()
- {
-    Token xsp;
-    xsp = jj_scanpos;
-    if (jj_3R_34()) {
-    jj_scanpos = xsp;
-    if (jj_3R_35()) {
-    jj_scanpos = xsp;
-    if (jj_3R_36()) return true;
-    }
-    }
-    return false;
-  }
-
-  private boolean jj_3R_34()
- {
-    if (jj_3R_20()) return true;
-    return false;
-  }
-
-  private boolean jj_3_7()
- {
-    if (jj_3R_19()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_14()
- {
-    if (jj_3R_18()) return true;
-    if (jj_scan_token(PERIOD)) return true;
-    if (jj_3R_11()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_19()
- {
-    if (jj_3R_29()) return true;
-    if (jj_scan_token(COMP_OP)) return true;
-    if (jj_3R_29()) return true;
-    return false;
-  }
-
-  private boolean jj_3_4()
- {
-    if (jj_3R_15()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_54()
- {
-    if (jj_3R_55()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_13()
- {
-    if (jj_3R_18()) return true;
-    if (jj_scan_token(PERIOD)) return true;
-    if (jj_3R_11()) return true;
-    if (jj_scan_token(AS)) return true;
-    if (jj_3R_11()) return true;
-    return false;
-  }
-
-  private boolean jj_3_3()
- {
-    if (jj_3R_14()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_53()
- {
-    if (jj_3R_19()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_51()
- {
-    Token xsp;
-    xsp = jj_scanpos;
-    if (jj_3R_53()) {
-    jj_scanpos = xsp;
-    if (jj_3R_54()) return true;
-    }
-    return false;
-  }
-
-  private boolean jj_3_2()
- {
-    if (jj_3R_13()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_52()
- {
-    if (jj_scan_token(LEFT_PAREN)) return true;
-    if (jj_3R_27()) return true;
-    if (jj_scan_token(RIGHT_PAREN)) return true;
-    return false;
-  }
-
-  private boolean jj_3R_50()
- {
-    if (jj_3R_52()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_22()
- {
-    if (jj_scan_token(LEGAL_IDENTIFIER)) return true;
-    return false;
-  }
-
-  private boolean jj_3R_49()
- {
-    if (jj_3R_51()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_48()
- {
-    Token xsp;
-    xsp = jj_scanpos;
-    if (jj_3R_49()) {
-    jj_scanpos = xsp;
-    if (jj_3R_50()) return true;
-    }
-    return false;
-  }
-
-  private boolean jj_3R_11()
- {
-    Token xsp;
-    xsp = jj_scanpos;
-    if (jj_3R_22()) {
-    jj_scanpos = xsp;
-    if (jj_scan_token(19)) return true;
-    }
     return false;
   }
 
