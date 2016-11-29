@@ -74,6 +74,8 @@ public class SimpleDBMS implements SimpleDBMSConstants {
     handleSyntaxError(parser);
   }
 
+
+
   public static void handleSyntaxError(SimpleDBMS parser)
   {
     try
@@ -94,15 +96,22 @@ public class SimpleDBMS implements SimpleDBMSConstants {
     handleSyntaxError(parser);
   }
 
-// Checking Functions// Get column definition from DB and check duplicate columns
-//COME BACK  final public String CheckInsertColumnNonNullable(String tblName) throws ParseException {
-String colValStr = myDB.getDB(tblName + " @tmptuple").elementAt(0);
+// Checking Functions// Get column definition from DB and check duplicate columns  final public 
+String CheckInsertColumnNonNullable(String tblName) throws ParseException {
+addNullExiplicitly(tblName);
+        String tupleToCheck = myDB.getDB(tblName + " @tmptuple").elementAt(0);
+        StringTokenizer st = new StringTokenizer(tupleToCheck, delim);
 
-        // tblName의 column definition을 돌면서 not nullable이 있는 경우
-        // 두 가지 조건을 만족해야한다
-        // tmpCol에 그 column이 있는지
-        // 그 column의 value 가 "null"이 아닌지
-        {if ("" != null) return colValStr;}
+            while (st.hasMoreTokens())
+            {
+              String col_name = st.nextToken();
+              String col_val = st.nextToken();
+              if(col_val.equals("null") &&
+               !IsColumnNullable(tblName, col_name)){
+                 {if ("" != null) return col_name;}
+              }
+            }
+        {if ("" != null) return null;}
     throw new Error("Missing return statement in function");
   }
 
@@ -149,7 +158,9 @@ StringTokenizer st1 = new StringTokenizer(tmpCols.substring(1), delim);
                     String colName = st1.nextToken();
                     String colVal = st2.nextToken();
                     String colType = GetColumnType(tblName, colName);
-                      if(colVal.equals("null")){ continue; }
+                      if(colVal.equals("null")){
+                      tupleInput += "|"+colName+"|"+colVal;
+                      continue; }
                       if(colType.equals("int")){
                            try {
                                 Integer.parseInt(colVal); }
@@ -494,7 +505,12 @@ Vector<String> tblNames = myDB.getDB("@table name");
   }
 
 // Error Functions  final public 
-void InsertTypeMismatchError() throws ParseException {
+void InsertColumnNonNullableError(String colName) throws ParseException {
+System.out.println("Insertion has failed: '"+colName+"' is not nullable");
+    handleDBError(parser);
+  }
+
+  final public void InsertTypeMismatchError() throws ParseException {
 System.out.println("Insertion has failed: Types are not matched");
     handleDBError(parser);
   }
@@ -571,7 +587,57 @@ System.out.println("There is no table");
     handleDBError(parser);
   }
 
-// Utility Functions// Get type of column  final public String GetColumnType(String tblName, String colName) throws ParseException {
+// Utility Functions  final public 
+
+void addNullExiplicitly(String tblName) throws ParseException {
+String colValStr = myDB.getDB(tblName + " @tmptuple").elementAt(0);
+
+            StringTokenizer st1 = new StringTokenizer(colValStr, delim);
+            Vector<String> tmp = new Vector<String>();
+
+              while (st1.hasMoreTokens())
+                        {
+                          String col_name = st1.nextToken();
+                          String col_value = st1.nextToken();
+                          tmp.addElement(col_name);
+                        }
+
+            String colDef = myDB.getDB(tblName + " @column definition").elementAt(0);
+            StringTokenizer st = new StringTokenizer(colDef, delim);
+            while (st.hasMoreTokens())
+            {
+              String colName = st.nextToken();
+              String colType = st.nextToken();
+              if (!tmp.contains(colName))
+              {
+                 colValStr += "|"+colName+"|null";
+              }
+            }
+
+            myDB.deleteDB(tblName + " @tmptuple");
+            myDB.putDB(tblName+" @tmptuple", colValStr);
+  }
+
+  final public boolean IsColumnNullable(String tblName, String colName) throws ParseException {
+String colDefStr = myDB.getDB(tblName + " @column definition").elementAt(0);
+    StringTokenizer st = new StringTokenizer(colDefStr, delim);
+    while (st.hasMoreTokens())
+    {
+      String _colName = st.nextToken();
+      String colType = st.nextToken();
+      if (colName.equals(_colName))
+      {
+        StringTokenizer st2 = new StringTokenizer(colType, "*");
+        st2.nextToken();
+        {if ("" != null) return !st2.hasMoreTokens();}
+      }
+    }
+    {if ("" != null) return false;} // never reached since the argument must be valid.
+
+    throw new Error("Missing return statement in function");
+  }
+
+// Get type of column  final public String GetColumnType(String tblName, String colName) throws ParseException {
 String colDefStr = myDB.getDB(tblName + " @column definition").elementAt(0);
     StringTokenizer st = new StringTokenizer(colDefStr, delim);
     while (st.hasMoreTokens())
@@ -845,10 +911,8 @@ Success(i);
 
   final public int ExitQuery() throws ParseException {
     jj_consume_token(EXIT);
-System.out.println(tmpCols); // FIX NEEDED
-    System.out.println(tmpVals);
-    String colValStr = myDB.getDB("account" + " @tmptuple").elementAt(0);
-    System.out.println(" coValStr: "+colValStr);
+String tupleResult = myDB.getDB("account @tuple").elementAt(0);
+    System.out.println("tuple inserted:"+tupleResult);
     {if ("" != null) return - 1;}
     throw new Error("Missing return statement in function");
   }
@@ -1585,6 +1649,10 @@ if (CheckNoSuchTable(tblName))
     if ( (CheckInsertTypeMismatch(tblName))){
             InsertTypeMismatchError();
     }
+
+    if ( (colName = CheckInsertColumnNonNullable(tblName))!= null){
+            InsertColumnNonNullableError(colName);
+    }
     // 3) CheckInsertColumnNonNullable
     // 4) CheckInsertDuplicatePrimaryKey
     // 5) CheckInsㅏertReferentialIntegrity
@@ -1796,6 +1864,72 @@ System.out.println("Syntax error");
     try { return !jj_3_9(); }
     catch(LookaheadSuccess ls) { return true; }
     finally { jj_save(8, xla); }
+  }
+
+  private boolean jj_3R_43()
+ {
+    if (jj_scan_token(NOT)) return true;
+    if (jj_3R_48()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_42()
+ {
+    if (jj_3R_48()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_39()
+ {
+    Token xsp;
+    xsp = jj_scanpos;
+    if (jj_3R_42()) {
+    jj_scanpos = xsp;
+    if (jj_3R_43()) return true;
+    }
+    return false;
+  }
+
+  private boolean jj_3R_40()
+ {
+    if (jj_scan_token(AND)) return true;
+    if (jj_3R_39()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_32()
+ {
+    if (jj_3R_39()) return true;
+    Token xsp;
+    while (true) {
+      xsp = jj_scanpos;
+      if (jj_3R_40()) { jj_scanpos = xsp; break; }
+    }
+    return false;
+  }
+
+  private boolean jj_3R_28()
+ {
+    if (jj_scan_token(LEGAL_IDENTIFIER)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_33()
+ {
+    if (jj_scan_token(OR)) return true;
+    if (jj_3R_32()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_18()
+ {
+    Token xsp;
+    xsp = jj_scanpos;
+    if (jj_3R_28()) {
+    jj_scanpos = xsp;
+    if (jj_scan_token(19)) return true;
+    }
+    return false;
   }
 
   private boolean jj_3R_27()
@@ -2189,72 +2323,6 @@ System.out.println("Syntax error");
     Token xsp;
     xsp = jj_scanpos;
     if (jj_3R_22()) {
-    jj_scanpos = xsp;
-    if (jj_scan_token(19)) return true;
-    }
-    return false;
-  }
-
-  private boolean jj_3R_43()
- {
-    if (jj_scan_token(NOT)) return true;
-    if (jj_3R_48()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_42()
- {
-    if (jj_3R_48()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_39()
- {
-    Token xsp;
-    xsp = jj_scanpos;
-    if (jj_3R_42()) {
-    jj_scanpos = xsp;
-    if (jj_3R_43()) return true;
-    }
-    return false;
-  }
-
-  private boolean jj_3R_40()
- {
-    if (jj_scan_token(AND)) return true;
-    if (jj_3R_39()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_32()
- {
-    if (jj_3R_39()) return true;
-    Token xsp;
-    while (true) {
-      xsp = jj_scanpos;
-      if (jj_3R_40()) { jj_scanpos = xsp; break; }
-    }
-    return false;
-  }
-
-  private boolean jj_3R_28()
- {
-    if (jj_scan_token(LEGAL_IDENTIFIER)) return true;
-    return false;
-  }
-
-  private boolean jj_3R_33()
- {
-    if (jj_scan_token(OR)) return true;
-    if (jj_3R_32()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_18()
- {
-    Token xsp;
-    xsp = jj_scanpos;
-    if (jj_3R_28()) {
     jj_scanpos = xsp;
     if (jj_scan_token(19)) return true;
     }
@@ -2662,7 +2730,6 @@ class myDatabase
       cursor.close();
     }
   }
-
   // For DB error handling and drop table query  public static void deleteTable(String tblName)
   {
     Cursor cursor = null;
