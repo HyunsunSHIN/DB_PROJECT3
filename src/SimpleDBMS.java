@@ -94,18 +94,23 @@ public class SimpleDBMS implements SimpleDBMSConstants {
     handleSyntaxError(parser);
   }
 
-// Checking Functions// Get column definition from DB and check duplicate columns  final public 
+// Checking Functions
+// Get column definition from DB and check duplicate columns
+  final public 
 
 String CheckInsertColumnExistence(String tblName) throws ParseException {
 // tmpCols =>분리 & tblNAm @colDef의 Value가 포함하고있나?
         Vector<String> colNames = new Vector<String>();
         String colDef = myDB.getDB(tblName + " @column definition").elementAt(0);
         StringTokenizer st = new StringTokenizer(colDef, delim);
+        String replacer_tmpCols = "";
+
           while (st.hasMoreTokens())
             {
               String colName = st.nextToken();
               String colType = st.nextToken();
               colNames.addElement(colName);
+                replacer_tmpCols = replacer_tmpCols.concat("|"+colName);
             }
 
         if(tmpCols.length() > 0 ){
@@ -118,18 +123,61 @@ String CheckInsertColumnExistence(String tblName) throws ParseException {
                       {if ("" != null) return colName;}
                     }
                   }
-        }
+        } else { tmpCols = replacer_tmpCols;}
+      System.out.println("tmpCols:" + tmpCols);
+
+
         {if ("" != null) return null;}
     throw new Error("Missing return statement in function");
   }
 
-  final public boolean CheckInsertTypeMismatch() throws ParseException {
-StringTokenizer st1 = new StringTokenizer(tmpCols.substring(1), delim);
+  final public boolean CheckInsertTypeMismatch(String tblName) throws ParseException {
+      //System.out.println("tmpCols: "+tmpCols);
+      StringTokenizer st1 = new StringTokenizer(tmpCols.substring(1), delim);
       StringTokenizer st2 = new StringTokenizer(tmpVals.substring(1), delim);
 
       if(st1.countTokens() != st2.countTokens() ){
         {if ("" != null) return true;}
       }
+
+                while (st1.hasMoreTokens())
+                  {
+                    String colName = st1.nextToken();
+                    String colVal = st2.nextToken();
+                    String colType = GetColumnType(tblName, colName);
+
+                      if(colType.equals("int")){
+                          try {
+                          Integer.parseInt(colVal); }
+                          catch (NumberFormatException e ){
+                              return true;
+                          }
+
+                      } else if (colType.equals("date")){
+                          System.out.println("reaced here");
+                          String[] yyyymmdd_arr = colVal.split("-");
+                          if( yyyymmdd_arr.length != 3 ){ return true; }
+
+                              for(int k = 0 ; k < 3 ; k ++ ){
+                                  try {
+                                      Integer.parseInt(yyyymmdd_arr[k]); }
+                                  catch (NumberFormatException e ){
+                                      return true;
+                                  }
+                          }
+
+                      } else if (colType.startsWith("char(")){
+
+                          if (!colVal.startsWith("'") || !colVal.endsWith("'")){
+                              return true;
+                          }
+
+                      } else {
+                        {if ("" != null)
+                            System.out.println("reaced here!");
+                            return true;}
+                      }
+                  }
 
      {if ("" != null) return false;}
     throw new Error("Missing return statement in function");
@@ -156,19 +204,22 @@ Vector<String> tmp = new Vector<String>();
     throw new Error("Missing return statement in function");
   }
 
-// Get table names from DB and check whether input table name exists in DB  final public boolean CheckTableExistence(String tblName) throws ParseException {
+// Get table names from DB and check whether input table name exists in DB
+  final public boolean CheckTableExistence(String tblName) throws ParseException {
 Vector<String> tables = myDB.getDB("@table name");
     {if ("" != null) return tables.contains(tblName);}
     throw new Error("Missing return statement in function");
   }
 
-// Get primary key definition from this table and check whether it occurs more than one times  final public boolean CheckDuplicatePrimaryKeyDef(String tblName) throws ParseException {
+// Get primary key definition from this table and check whether it occurs more than one times
+  final public boolean CheckDuplicatePrimaryKeyDef(String tblName) throws ParseException {
 Vector<String> priKeys = myDB.getDB(tblName + " @primary key");
     {if ("" != null) return priKeys.size() > 1;}
     throw new Error("Missing return statement in function");
   }
 
-// Get primary key and foreign key definition from this table and check whether column names of this definition didn't occur in DB  final public String CheckNonExistingColumnDef(String tblName) throws ParseException {
+// Get primary key and foreign key definition from this table and check whether column names of this definition didn't occur in DB
+  final public String CheckNonExistingColumnDef(String tblName) throws ParseException {
 Vector<String> priKeys = myDB.getDB(tblName + " @primary key");
     Vector<String> forKeys = myDB.getDB(tblName + " @foreign key");
     Vector<String> colNames = new Vector<String>();
@@ -216,7 +267,8 @@ Vector<String> priKeys = myDB.getDB(tblName + " @primary key");
     throw new Error("Missing return statement in function");
   }
 
-// Get referenced table names from this table and check whether those referenced tables are really exist  final public boolean CheckReferenceTableExistence(String tblName) throws ParseException {
+// Get referenced table names from this table and check whether those referenced tables are really exist
+  final public boolean CheckReferenceTableExistence(String tblName) throws ParseException {
 Vector<String> forKeys = myDB.getDB(tblName + " @foreign key");
     Vector<String> tblNames = myDB.getDB("@table name");
     String refTblName = "";
@@ -242,7 +294,8 @@ Vector<String> forKeys = myDB.getDB(tblName + " @foreign key");
     throw new Error("Missing return statement in function");
   }
 
-// Get referenced columns from this table and check whether these columns are not primary key of referenced table  final public boolean CheckReferenceNonPrimaryKey(String tblName) throws ParseException {
+// Get referenced columns from this table and check whether these columns are not primary key of referenced table
+  final public boolean CheckReferenceNonPrimaryKey(String tblName) throws ParseException {
 Vector<String> forKeys = myDB.getDB(tblName + " @foreign key");
     String refTblName = "";
     for (int i = 0; i < forKeys.size(); i++)
@@ -293,7 +346,8 @@ Vector<String> forKeys = myDB.getDB(tblName + " @foreign key");
     throw new Error("Missing return statement in function");
   }
 
-// Get referenced columns from this table and check whether these columns are really exist in referenced table  final public boolean CheckReferenceColumnExistence(String tblName) throws ParseException {
+// Get referenced columns from this table and check whether these columns are really exist in referenced table
+  final public boolean CheckReferenceColumnExistence(String tblName) throws ParseException {
 Vector<String> forKeys = myDB.getDB(tblName + " @foreign key");
     String refTblName = "";
     for (int i = 0; i < forKeys.size(); i++)
@@ -341,7 +395,8 @@ Vector<String> forKeys = myDB.getDB(tblName + " @foreign key");
     throw new Error("Missing return statement in function");
   }
 
-// Get type of referenced columns and referencing columns and check whether types of both columns are same  final public boolean CheckReferenceType(String tblName) throws ParseException {
+// Get type of referenced columns and referencing columns and check whether types of both columns are same
+  final public boolean CheckReferenceType(String tblName) throws ParseException {
 Vector<String> forKeys = myDB.getDB(tblName + " @foreign key");
     for (int i = 0; i < forKeys.size(); i++)
     {
@@ -395,13 +450,15 @@ Vector<String> forKeys = myDB.getDB(tblName + " @foreign key");
     throw new Error("Missing return statement in function");
   }
 
-// Get table names of DB and check whether this table exists  final public boolean CheckNoSuchTable(String tblName) throws ParseException {
+// Get table names of DB and check whether this table exists
+  final public boolean CheckNoSuchTable(String tblName) throws ParseException {
 Vector<String> tblNames = myDB.getDB("@table name");
     {if ("" != null) return !tblNames.contains(tblName);}
     throw new Error("Missing return statement in function");
   }
 
-// Get referenced table names of DB and check whether this table is referenced by other table  final public boolean CheckDropReferencedTable(String refTblName) throws ParseException {
+// Get referenced table names of DB and check whether this table is referenced by other table
+  final public boolean CheckDropReferencedTable(String refTblName) throws ParseException {
 Vector<String> tblNames = myDB.getDB("@table name");
     for (int i = 0; i < tblNames.size(); i++)
     {
@@ -430,13 +487,15 @@ Vector<String> tblNames = myDB.getDB("@table name");
     throw new Error("Missing return statement in function");
   }
 
-// Check whether there is no table  final public boolean CheckShowTablesNoTable() throws ParseException {
+// Check whether there is no table
+  final public boolean CheckShowTablesNoTable() throws ParseException {
 Vector<String> tblNames = myDB.getDB("@table name");
     {if ("" != null) return (tblNames.size() == 0);}
     throw new Error("Missing return statement in function");
   }
 
-// Error Functions  final public 
+// Error Functions
+  final public 
 void InsertTypeMismatchError() throws ParseException {
 System.out.println("Insertion has failed: Types are not matched");
     handleDBError(parser);
@@ -514,7 +573,9 @@ System.out.println("There is no table");
     handleDBError(parser);
   }
 
-// Utility Functions// Get type of column  final public String GetColumnType(String tblName, String colName) throws ParseException {
+// Utility Functions
+// Get type of column
+  final public String GetColumnType(String tblName, String colName) throws ParseException {
 String colDefStr = myDB.getDB(tblName + " @column definition").elementAt(0);
     StringTokenizer st = new StringTokenizer(colDefStr, delim);
     while (st.hasMoreTokens())
@@ -531,7 +592,8 @@ String colDefStr = myDB.getDB(tblName + " @column definition").elementAt(0);
     throw new Error("Missing return statement in function");
   }
 
-// Change columns of primary key to not null  final public void ChangeToNotNull(String tblName) throws ParseException {
+// Change columns of primary key to not null
+  final public void ChangeToNotNull(String tblName) throws ParseException {
 Vector<String> priKeys = myDB.getDB(tblName + " @primary key");
     if (priKeys.size() > 0)
     {
@@ -567,7 +629,8 @@ Vector<String> priKeys = myDB.getDB(tblName + " @primary key");
     }
   }
 
-// Perform drop table query  final public void DropTable(String tblName) throws ParseException {
+// Perform drop table query
+  final public void DropTable(String tblName) throws ParseException {
 myDB.deleteTable(tblName);
     myDB.deleteDB("@table name");
     tblNameList.remove(tblName);
@@ -577,7 +640,8 @@ myDB.deleteTable(tblName);
     }
   }
 
-// Perform show tables query  final public void ShowTables() throws ParseException {
+// Perform show tables query
+  final public void ShowTables() throws ParseException {
 Vector<String> tblNames = myDB.getDB("@table name");
     System.out.println("-------------------------");
     for (int i = 0; i < tblNames.size(); i++)
@@ -587,7 +651,8 @@ Vector<String> tblNames = myDB.getDB("@table name");
     System.out.println("-------------------------");
   }
 
-// Check whether given column is primary key column  final public boolean IsPrimaryKey(String tblName, String colName) throws ParseException {
+// Check whether given column is primary key column
+  final public boolean IsPrimaryKey(String tblName, String colName) throws ParseException {
 Vector<String> priKeys = myDB.getDB(tblName + " @primary key");
     if (priKeys.size() > 0)
     {
@@ -606,7 +671,8 @@ Vector<String> priKeys = myDB.getDB(tblName + " @primary key");
     throw new Error("Missing return statement in function");
   }
 
-// Check whether given column is foreign key column  final public boolean IsForeignKey(String tblName, String colName) throws ParseException {
+// Check whether given column is foreign key column
+  final public boolean IsForeignKey(String tblName, String colName) throws ParseException {
 Vector<String> forKeys = myDB.getDB(tblName + " @foreign key");
     for (int i = 0; i < forKeys.size(); i++)
     {
@@ -629,7 +695,8 @@ Vector<String> forKeys = myDB.getDB(tblName + " @foreign key");
     throw new Error("Missing return statement in function");
   }
 
-// Perform desc query  final public void Describe(String tblName) throws ParseException {
+// Perform desc query
+  final public void Describe(String tblName) throws ParseException {
 String colDef = myDB.getDB(tblName + " @column definition").elementAt(0);
     StringTokenizer st = new StringTokenizer(colDef, delim);
     System.out.println("------------------------------------------------------------");
@@ -677,7 +744,8 @@ String colDef = myDB.getDB(tblName + " @column definition").elementAt(0);
     System.out.println("------------------------------------------------------------");
   }
 
-// Success Functions  final public void CreateTableSuccess() throws ParseException {
+// Success Functions
+  final public void CreateTableSuccess() throws ParseException {
 System.out.println("'" + createTblName + "' table is created");
   }
 
@@ -685,7 +753,8 @@ System.out.println("'" + createTblName + "' table is created");
 System.out.println("'" + dropTblName + "' table is dropped");
   }
 
-// Parsing Functions  final public void Command() throws ParseException {
+// Parsing Functions
+  final public void Command() throws ParseException {
     QueryList();
   }
 
@@ -1523,7 +1592,7 @@ if (CheckNoSuchTable(tblName))
             InsertColumnExistenceError(colName);
         }
 
-    if ( (CheckInsertTypeMismatch())){
+    if ( (CheckInsertTypeMismatch(tblName))){
             InsertTypeMismatchError();
     }
 
@@ -1741,90 +1810,6 @@ System.out.println("Syntax error");
     try { return !jj_3_9(); }
     catch(LookaheadSuccess ls) { return true; }
     finally { jj_save(8, xla); }
-  }
-
-  private boolean jj_3_1()
- {
-    if (jj_3R_11()) return true;
-    if (jj_3R_12()) return true;
-    if (jj_scan_token(NOT_NULL)) return true;
-    return false;
-  }
-
-  private boolean jj_3_8()
- {
-    if (jj_3R_20()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_20()
- {
-    if (jj_3R_18()) return true;
-    if (jj_scan_token(PERIOD)) return true;
-    if (jj_3R_11()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_36()
- {
-    if (jj_3R_41()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_35()
- {
-    if (jj_3R_11()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_15()
- {
-    if (jj_3R_11()) return true;
-    if (jj_scan_token(AS)) return true;
-    if (jj_3R_11()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_29()
- {
-    Token xsp;
-    xsp = jj_scanpos;
-    if (jj_3R_34()) {
-    jj_scanpos = xsp;
-    if (jj_3R_35()) {
-    jj_scanpos = xsp;
-    if (jj_3R_36()) return true;
-    }
-    }
-    return false;
-  }
-
-  private boolean jj_3R_34()
- {
-    if (jj_3R_20()) return true;
-    return false;
-  }
-
-  private boolean jj_3_7()
- {
-    if (jj_3R_19()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_14()
- {
-    if (jj_3R_18()) return true;
-    if (jj_scan_token(PERIOD)) return true;
-    if (jj_3R_11()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_19()
- {
-    if (jj_3R_29()) return true;
-    if (jj_scan_token(COMP_OP)) return true;
-    if (jj_3R_29()) return true;
-    return false;
   }
 
   private boolean jj_3_4()
@@ -2206,6 +2191,90 @@ System.out.println("Syntax error");
     return false;
   }
 
+  private boolean jj_3_1()
+ {
+    if (jj_3R_11()) return true;
+    if (jj_3R_12()) return true;
+    if (jj_scan_token(NOT_NULL)) return true;
+    return false;
+  }
+
+  private boolean jj_3_8()
+ {
+    if (jj_3R_20()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_20()
+ {
+    if (jj_3R_18()) return true;
+    if (jj_scan_token(PERIOD)) return true;
+    if (jj_3R_11()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_36()
+ {
+    if (jj_3R_41()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_35()
+ {
+    if (jj_3R_11()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_15()
+ {
+    if (jj_3R_11()) return true;
+    if (jj_scan_token(AS)) return true;
+    if (jj_3R_11()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_29()
+ {
+    Token xsp;
+    xsp = jj_scanpos;
+    if (jj_3R_34()) {
+    jj_scanpos = xsp;
+    if (jj_3R_35()) {
+    jj_scanpos = xsp;
+    if (jj_3R_36()) return true;
+    }
+    }
+    return false;
+  }
+
+  private boolean jj_3R_34()
+ {
+    if (jj_3R_20()) return true;
+    return false;
+  }
+
+  private boolean jj_3_7()
+ {
+    if (jj_3R_19()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_14()
+ {
+    if (jj_3R_18()) return true;
+    if (jj_scan_token(PERIOD)) return true;
+    if (jj_3R_11()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_19()
+ {
+    if (jj_3R_29()) return true;
+    if (jj_scan_token(COMP_OP)) return true;
+    if (jj_3R_29()) return true;
+    return false;
+  }
+
   /** Generated Token Manager. */
   public SimpleDBMSTokenManager token_source;
   SimpleCharStream jj_input_stream;
@@ -2583,7 +2652,8 @@ class myDatabase
     {}
   }
 
-  // For debugging  public static void printDB()
+  // For debugging
+  public static void printDB()
   {
     Cursor cursor = null;
     try
@@ -2608,7 +2678,8 @@ class myDatabase
     }
   }
 
-  // For DB error handling and drop table query  public static void deleteTable(String tblName)
+  // For DB error handling and drop table query
+  public static void deleteTable(String tblName)
   {
     Cursor cursor = null;
     try
