@@ -97,9 +97,71 @@ public class SimpleDBMS implements SimpleDBMSConstants {
   }
 
 // Checking Functions// Get column definition from DB and check duplicate columns  final public 
-boolean CheckInsertDuplicatePrimaryKeyError(String tblName) throws ParseException {
+
+boolean CheckInsertReferentialIntegrity(String tblName) throws ParseException {
 String tupleString_input = myDB.getDB(tblName + " @tmptuple").elementAt(0);
-         String PriKeys = myDB.getDB(tblName + " @primary key").elementAt(0);
+      Vector<String> forKeys = myDB.getDB(tblName + " @foreign key");
+
+       for (int i = 0; i < forKeys.size(); i++)
+       {
+            boolean reached_references = false;
+            String referenced_tblName = "";
+            Vector<String> forkey_vertor = new Vector<String>();
+            Vector<String> forkey_vector_referenced = new Vector<String>();
+            String forKeyStr = forKeys.elementAt(i);
+            StringTokenizer st = new StringTokenizer(forKeyStr, delim);
+            while (st.hasMoreTokens())
+            {
+              String tmp = st.nextToken();
+              if (tmp.contains("references"))
+              { referenced_tblName = tmp.substring(12); // referenced table 을 참조해야하기 때문에, 이  이후에 작업하도록 한다.
+                reached_references= true;
+              }
+              else if(!reached_references)
+              { forkey_vertor.addElement(tmp);
+              }
+              else
+              {
+                forkey_vector_referenced.addElement(tmp);
+              }
+            }
+
+           Vector<String> tuples_possibly_referenced= myDB.getDB(referenced_tblName+" @tuple"); // referencing table의 tuple들을 모두 조사한다
+           if(tuples_possibly_referenced.size() == 0 ){ {if ("" != null) return false;} }
+           boolean found = true ;
+           for(int n = 0; n < tuples_possibly_referenced.size() ; n++){
+                String tupleString_to_Compare = tuples_possibly_referenced.elementAt(n);
+                found = true;
+
+                for(int j = 0 ; j < forkey_vertor.size() ; j++){
+                             String forkey_value_referencing
+                              = GetColumnValue(tupleString_input,forkey_vertor.elementAt(j));
+
+                             String forkey_value_refered
+                              = GetColumnValue(tupleString_to_Compare, forkey_vector_referenced.elementAt(j));
+
+                              if(!forkey_value_refered.equals(forkey_value_referencing) && (forkey_value_referencing!= "null") ){
+                              found = false; break;
+                              }
+                }
+                if( found ){ break; } // 여기에 도달했다는 것은,
+                 //특정 forein Key column들이 모두 같은 tuple을 발견했다는 것이다.
+                 // 이게 발견 되어야만 다음 foreign key 를 조사할 수 있도록한다 바로 아래 코드가 그런 역할을 함
+           }
+           if(!found ){ {if ("" != null) return false;} }
+       }
+       {if ("" != null) return true;}
+    throw new Error("Missing return statement in function");
+  }
+
+  final public boolean CheckInsertDuplicatePrimaryKeyError(String tblName) throws ParseException {
+String tupleString_input = myDB.getDB(tblName + " @tmptuple").elementAt(0);
+         String PriKeys ="";
+         Vector<String> PriKeysVector = myDB.getDB(tblName + " @primary key");
+
+        if(PriKeysVector.size() == 0){{if ("" != null) return false;}}
+        else{ PriKeys = PriKeysVector.elementAt(0);}
+
         Vector<String> tuples = myDB.getDB(tblName+ " @tuple");
 
          if(tuples.size() == 0 ){ {if ("" != null) return false;}}
@@ -531,7 +593,12 @@ Vector<String> tblNames = myDB.getDB("@table name");
   }
 
 // Error Functions  final public 
-void InsertDuplicatePrimaryKeyError() throws ParseException {
+void InsertReferentialIntegrityError() throws ParseException {
+System.out.println("Insertion has failed: Referential integrity violation");
+    handleDBError(parser);
+  }
+
+  final public void InsertDuplicatePrimaryKeyError() throws ParseException {
 System.out.println("Insertion has failed: Primary key duplication");
         handleDBError(parser);
   }
@@ -1704,8 +1771,10 @@ myDB.deleteDB(tblName+" @tmptuple"); // 에러가 났을 경우 아직도 남아
         InsertDuplicatePrimaryKeyError();
     }
 
-    // 4) CheckInsertDuplicatePrimaryKey
-    // 5) CheckInsertReferentialIntegrity
+    if ( !CheckInsertReferentialIntegrity(tblName)){
+        InsertReferentialIntegrityError();
+    }
+
    myDB.putDB(tblName + " @tuple", myDB.getDB(tblName+" @tmptuple").elementAt(0));
    {if ("" != null) return 5;}
     throw new Error("Missing return statement in function");
@@ -1914,6 +1983,114 @@ System.out.println("Syntax error");
     try { return !jj_3_9(); }
     catch(LookaheadSuccess ls) { return true; }
     finally { jj_save(8, xla); }
+  }
+
+  private boolean jj_3R_26()
+ {
+    if (jj_3R_30()) return true;
+    Token xsp;
+    while (true) {
+      xsp = jj_scanpos;
+      if (jj_3R_31()) { jj_scanpos = xsp; break; }
+    }
+    return false;
+  }
+
+  private boolean jj_3R_46()
+ {
+    if (jj_scan_token(DIGIT)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_12()
+ {
+    Token xsp;
+    xsp = jj_scanpos;
+    if (jj_3R_23()) {
+    jj_scanpos = xsp;
+    if (jj_3R_24()) {
+    jj_scanpos = xsp;
+    if (jj_3R_25()) return true;
+    }
+    }
+    return false;
+  }
+
+  private boolean jj_3R_23()
+ {
+    if (jj_scan_token(INT)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_45()
+ {
+    if (jj_scan_token(INT_VALUE)) return true;
+    return false;
+  }
+
+  private boolean jj_3_5()
+ {
+    if (jj_3R_16()) return true;
+    if (jj_3R_17()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_44()
+ {
+    if (jj_scan_token(DATE_VALUE)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_41()
+ {
+    Token xsp;
+    xsp = jj_scanpos;
+    if (jj_3R_44()) {
+    jj_scanpos = xsp;
+    if (jj_3R_45()) {
+    jj_scanpos = xsp;
+    if (jj_3R_46()) {
+    jj_scanpos = xsp;
+    if (jj_3R_47()) return true;
+    }
+    }
+    }
+    return false;
+  }
+
+  private boolean jj_3R_16()
+ {
+    if (jj_scan_token(FROM)) return true;
+    if (jj_3R_26()) return true;
+    return false;
+  }
+
+  private boolean jj_3_1()
+ {
+    if (jj_3R_11()) return true;
+    if (jj_3R_12()) return true;
+    if (jj_scan_token(NOT_NULL)) return true;
+    return false;
+  }
+
+  private boolean jj_3_8()
+ {
+    if (jj_3R_20()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_20()
+ {
+    if (jj_3R_18()) return true;
+    if (jj_scan_token(PERIOD)) return true;
+    if (jj_3R_11()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_36()
+ {
+    if (jj_3R_41()) return true;
+    return false;
   }
 
   private boolean jj_3R_35()
@@ -2268,114 +2445,6 @@ System.out.println("Syntax error");
   private boolean jj_3R_47()
  {
     if (jj_scan_token(CHAR_STRING)) return true;
-    return false;
-  }
-
-  private boolean jj_3R_26()
- {
-    if (jj_3R_30()) return true;
-    Token xsp;
-    while (true) {
-      xsp = jj_scanpos;
-      if (jj_3R_31()) { jj_scanpos = xsp; break; }
-    }
-    return false;
-  }
-
-  private boolean jj_3R_46()
- {
-    if (jj_scan_token(DIGIT)) return true;
-    return false;
-  }
-
-  private boolean jj_3R_12()
- {
-    Token xsp;
-    xsp = jj_scanpos;
-    if (jj_3R_23()) {
-    jj_scanpos = xsp;
-    if (jj_3R_24()) {
-    jj_scanpos = xsp;
-    if (jj_3R_25()) return true;
-    }
-    }
-    return false;
-  }
-
-  private boolean jj_3R_23()
- {
-    if (jj_scan_token(INT)) return true;
-    return false;
-  }
-
-  private boolean jj_3R_45()
- {
-    if (jj_scan_token(INT_VALUE)) return true;
-    return false;
-  }
-
-  private boolean jj_3_5()
- {
-    if (jj_3R_16()) return true;
-    if (jj_3R_17()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_44()
- {
-    if (jj_scan_token(DATE_VALUE)) return true;
-    return false;
-  }
-
-  private boolean jj_3R_41()
- {
-    Token xsp;
-    xsp = jj_scanpos;
-    if (jj_3R_44()) {
-    jj_scanpos = xsp;
-    if (jj_3R_45()) {
-    jj_scanpos = xsp;
-    if (jj_3R_46()) {
-    jj_scanpos = xsp;
-    if (jj_3R_47()) return true;
-    }
-    }
-    }
-    return false;
-  }
-
-  private boolean jj_3R_16()
- {
-    if (jj_scan_token(FROM)) return true;
-    if (jj_3R_26()) return true;
-    return false;
-  }
-
-  private boolean jj_3_1()
- {
-    if (jj_3R_11()) return true;
-    if (jj_3R_12()) return true;
-    if (jj_scan_token(NOT_NULL)) return true;
-    return false;
-  }
-
-  private boolean jj_3_8()
- {
-    if (jj_3R_20()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_20()
- {
-    if (jj_3R_18()) return true;
-    if (jj_scan_token(PERIOD)) return true;
-    if (jj_3R_11()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_36()
- {
-    if (jj_3R_41()) return true;
     return false;
   }
 
