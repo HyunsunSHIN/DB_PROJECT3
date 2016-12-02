@@ -4,6 +4,7 @@ import java.util.Set;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
+import java.util.stream.Stream;
 import java.util.Arrays;
 import java.util.Vector;
 import java.util.StringTokenizer;
@@ -1452,7 +1453,8 @@ if (CheckNoSuchTable(tblName))
     jj_consume_token(SELECT);
     SelectList();
     TableExpression();
-{if ("" != null) return 4;}
+//System.out.println(tuple_space.toString());
+    {if ("" != null) return 4;}
     throw new Error("Missing return statement in function");
   }
 
@@ -1552,7 +1554,7 @@ if (CheckNoSuchTable(tblName))
   tuple_space =new HashSet<HashMap<String,String>> ();
     jj_consume_token(FROM);
     TableReferenceList();
-System.out.println(tuple_space.toString());
+
   }
 
   final public void TableReferenceList() throws ParseException {String alias="";
@@ -1601,7 +1603,7 @@ if (CheckNoSuchTable(tblName))
          NoSuchTable();
        }
    alias_table.put(tblName,tblName);
-   {if ("" != null) return alias;}
+   {if ("" != null) return tblName;}
         break;
         }
       default:
@@ -1755,10 +1757,15 @@ if (CheckNoSuchTable(tblName))
     }
   }
 
-  final public void CompOperandAux() throws ParseException {
-    TableName();
+  final public String CompOperandAux() throws ParseException {String result = "";
+  String TblName = "";
+  String ColName = "";
+    TblName = TableName();
     jj_consume_token(PERIOD);
-    ColumnName();
+    ColName = ColumnName();
+result = TblName+"."+ColName;
+   {if ("" != null) return result;}
+    throw new Error("Missing return statement in function");
   }
 
   final public String ComparableValue() throws ParseException {Token t;
@@ -1791,16 +1798,19 @@ if (CheckNoSuchTable(tblName))
     throw new Error("Missing return statement in function");
   }
 
-  final public void NullPredicate() throws ParseException {
+  final public void NullPredicate() throws ParseException {HashSet<HashMap<String,String>> tuple_set_result;
+String operand = ""; String condition ="";
     if (jj_2_9(2147483647)) {
-      NullPredicateAux();
-      NullOperation();
+      operand = NullPredicateAux();
+      tuple_set_result = NullOperation(operand);
+System.out.println(tuple_set_result.toString());
     } else {
       switch ((jj_ntk==-1)?jj_ntk_f():jj_ntk) {
       case ALPHABET:
       case LEGAL_IDENTIFIER:{
-        ColumnName();
-        NullOperation();
+        operand = ColumnName();
+        tuple_set_result = NullOperation(operand);
+System.out.println(tuple_set_result.toString());
         break;
         }
       default:
@@ -1811,20 +1821,41 @@ if (CheckNoSuchTable(tblName))
     }
   }
 
-  final public void NullPredicateAux() throws ParseException {
-    TableName();
+  final public String NullPredicateAux() throws ParseException {String result = "";
+   String tblName = "";
+   String ColName = "";
+    tblName = TableName();
     jj_consume_token(PERIOD);
-    ColumnName();
+    ColName = ColumnName();
+if (CheckNoSuchTable(tblName))
+         {
+           NoSuchTable();
+         }                          // COME BACK
+     result = tblName+"."+ColName; //윗단에서, 만약 이 result를 key로 갖는 value가 없는 경우엔 존재하지 않는 column임을 나타내는 에러를 띄운다
+     {if ("" != null) return result;}
+    throw new Error("Missing return statement in function");
   }
 
-  final public void NullOperation() throws ParseException {
+  final public HashSet<HashMap<String,String>> NullOperation(String operand) throws ParseException {HashSet<HashMap<String,String>> result_tuple_set = new HashSet<HashMap<String,String>> ();
     switch ((jj_ntk==-1)?jj_ntk_f():jj_ntk) {
     case IS_NULL:{
       jj_consume_token(IS_NULL);
+for(HashMap<String,String> item : tuple_space){
+                if( item.get(operand).equals("null")){
+                    result_tuple_set.add(item);
+                }
+     }
+     {if ("" != null) return result_tuple_set;}
       break;
       }
     case IS_NOT_NULL:{
       jj_consume_token(IS_NOT_NULL);
+for(HashMap<String,String> item : tuple_space){
+                     if(!item.get(operand).equals("null")){
+                         result_tuple_set.add(item);
+                     }
+          }
+          {if ("" != null) return result_tuple_set;}
       break;
       }
     default:
@@ -1832,6 +1863,7 @@ if (CheckNoSuchTable(tblName))
       jj_consume_token(-1);
       throw new ParseException();
     }
+    throw new Error("Missing return statement in function");
   }
 
   final public int InsertQuery() throws ParseException {createTblName = "";
@@ -2231,6 +2263,12 @@ System.out.println("Syntax error");
     return false;
   }
 
+  private boolean jj_3R_60()
+ {
+    if (jj_scan_token(IS_NOT_NULL)) return true;
+    return false;
+  }
+
   private boolean jj_3R_15()
  {
     if (jj_3R_11()) return true;
@@ -2267,6 +2305,23 @@ System.out.println("Syntax error");
     if (jj_3R_18()) return true;
     if (jj_scan_token(PERIOD)) return true;
     if (jj_3R_11()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_59()
+ {
+    if (jj_scan_token(IS_NULL)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_58()
+ {
+    Token xsp;
+    xsp = jj_scanpos;
+    if (jj_3R_59()) {
+    jj_scanpos = xsp;
+    if (jj_3R_60()) return true;
+    }
     return false;
   }
 
@@ -2340,6 +2395,14 @@ System.out.println("Syntax error");
     return false;
   }
 
+  private boolean jj_3R_21()
+ {
+    if (jj_3R_18()) return true;
+    if (jj_scan_token(PERIOD)) return true;
+    if (jj_3R_11()) return true;
+    return false;
+  }
+
   private boolean jj_3R_22()
  {
     if (jj_scan_token(LEGAL_IDENTIFIER)) return true;
@@ -2350,6 +2413,12 @@ System.out.println("Syntax error");
  {
     if (jj_scan_token(OR)) return true;
     if (jj_3R_32()) return true;
+    return false;
+  }
+
+  private boolean jj_3_9()
+ {
+    if (jj_3R_21()) return true;
     return false;
   }
 
@@ -2375,20 +2444,10 @@ System.out.println("Syntax error");
     return false;
   }
 
-  private boolean jj_3R_58()
+  private boolean jj_3R_57()
  {
-    Token xsp;
-    xsp = jj_scanpos;
-    if (jj_scan_token(41)) {
-    jj_scanpos = xsp;
-    if (jj_scan_token(42)) return true;
-    }
-    return false;
-  }
-
-  private boolean jj_3_9()
- {
-    if (jj_3R_21()) return true;
+    if (jj_3R_11()) return true;
+    if (jj_3R_58()) return true;
     return false;
   }
 
@@ -2396,21 +2455,6 @@ System.out.println("Syntax error");
  {
     if (jj_scan_token(WHERE)) return true;
     if (jj_3R_27()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_21()
- {
-    if (jj_3R_18()) return true;
-    if (jj_scan_token(PERIOD)) return true;
-    if (jj_3R_11()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_57()
- {
-    if (jj_3R_11()) return true;
-    if (jj_3R_58()) return true;
     return false;
   }
 
@@ -2432,9 +2476,21 @@ System.out.println("Syntax error");
     return false;
   }
 
+  private boolean jj_3R_47()
+ {
+    if (jj_scan_token(CHAR_STRING)) return true;
+    return false;
+  }
+
   private boolean jj_3R_28()
  {
     if (jj_scan_token(LEGAL_IDENTIFIER)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_46()
+ {
+    if (jj_scan_token(DIGIT)) return true;
     return false;
   }
 
@@ -2449,35 +2505,15 @@ System.out.println("Syntax error");
     return false;
   }
 
-  private boolean jj_3R_38()
- {
-    if (jj_3R_18()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_47()
- {
-    if (jj_scan_token(CHAR_STRING)) return true;
-    return false;
-  }
-
-  private boolean jj_3_6()
- {
-    if (jj_3R_18()) return true;
-    if (jj_scan_token(AS)) return true;
-    if (jj_3R_18()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_46()
- {
-    if (jj_scan_token(DIGIT)) return true;
-    return false;
-  }
-
   private boolean jj_3R_45()
  {
     if (jj_scan_token(INT_VALUE)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_38()
+ {
+    if (jj_3R_18()) return true;
     return false;
   }
 
@@ -2504,9 +2540,25 @@ System.out.println("Syntax error");
     return false;
   }
 
+  private boolean jj_3_6()
+ {
+    if (jj_3R_18()) return true;
+    if (jj_scan_token(AS)) return true;
+    if (jj_3R_18()) return true;
+    return false;
+  }
+
   private boolean jj_3R_25()
  {
     if (jj_scan_token(DATE)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_20()
+ {
+    if (jj_3R_18()) return true;
+    if (jj_scan_token(PERIOD)) return true;
+    if (jj_3R_11()) return true;
     return false;
   }
 
@@ -2532,14 +2584,6 @@ System.out.println("Syntax error");
   private boolean jj_3_8()
  {
     if (jj_3R_20()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_20()
- {
-    if (jj_3R_18()) return true;
-    if (jj_scan_token(PERIOD)) return true;
-    if (jj_3R_11()) return true;
     return false;
   }
 
