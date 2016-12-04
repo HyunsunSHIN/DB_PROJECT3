@@ -70,9 +70,7 @@ public class SimpleDBMS implements SimpleDBMSConstants {
   static Vector<String > tblNameList = new Vector<String >();
   static Hashtable<String,String> alias_table = new Hashtable<String,String>();
   static HashSet<HashMap<String,String>> tuple_space =new HashSet<HashMap<String,String>> ();
-  static Hashtable <String, String> tblname_table = new Hashtable<String,String>();
-
-  public static void main(String args []) throws ParseException
+  static Hashtable <String, String> tblname_table = new Hashtable<String,String>(); //<K,V> = <colName, alias> OR <colName, @dupliacation>  static Hashtable <String, String> tblcol_table = new Hashtable<String,String>(); // <K,V> = <alias.colName, type>  static Hashtable <String, String> selectedColumn_table = new Hashtable<String,String>(); // <K,V> = <alias, tblName.colName)  public static void main(String args []) throws ParseException
   {
     myDB.openDB();
     parser = new SimpleDBMS(System.in);
@@ -166,7 +164,7 @@ String tupleString_input = myDB.getDB(tblName + " @tmptuple").elementAt(0);
          String PriKeys ="";
          Vector<String> PriKeysVector = myDB.getDB(tblName + " @primary key");
 
-        if(PriKeysVector.size() == 0){{if ("" != null) return false;}}
+        if( PriKeysVector.size() == 0 ){{if ("" != null) return false;}}
         else{ PriKeys = PriKeysVector.elementAt(0);}
 
         Vector<String> tuples = myDB.getDB(tblName+ " @tuple");
@@ -600,7 +598,38 @@ Vector<String> tblNames = myDB.getDB("@table name");
   }
 
 // Error Functions  final public 
-void NotUniqueAliasrError(String alias) throws ParseException {
+
+void SelectColumnResolveError(String colName) throws ParseException {
+System.out.println("Selection has failed: fail to resolve '"+colName+"'");
+    handleDBError(parser);
+  }
+
+  final public void SelectTableExistenceError(String tblName) throws ParseException {
+System.out.println("Selection has failed: '"+tblName+"' does not exist");
+    handleDBError(parser);
+  }
+
+  final public void WhereIncomparableError() throws ParseException {
+System.out.println("Where clause try to compare incomparable values");
+    handleDBError(parser);
+  }
+
+  final public void WhereTableNotSpecifiedError() throws ParseException {
+System.out.println("Where clause try to reference tables which are not specified");
+    handleDBError(parser);
+  }
+
+  final public void WhereColumnNotExistError() throws ParseException {
+System.out.println("Where clause try to reference non existing column");
+    handleDBError(parser);
+  }
+
+  final public void WhereAmbiguousReferenceError() throws ParseException {
+System.out.println("Where clause contains ambiguous reference");
+    handleDBError(parser);
+  }
+
+  final public void NotUniqueAliasrError(String alias) throws ParseException {
 System.out.println("Not unique table/alias: '"+alias+"'");
     handleDBError(parser);
   }
@@ -621,7 +650,7 @@ System.out.println("Insertion has failed: '"+colName+"' is not nullable");
   }
 
   final public void InsertTypeMismatchError() throws ParseException {
-System.out.println("Insertion has failed: Primary key duplication");
+System.out.println("Insertion has failed:Insertion has failed: Types are not matched");
     handleDBError(parser);
   }
 
@@ -697,14 +726,128 @@ System.out.println("There is no table");
     handleDBError(parser);
   }
 
-// Utility Functions
-// HashSet<HashMap<String,String>> FilterTuples(String operator, String operand1, String operand2):// {}// {//    {////     }//// }  final public 
+// utility functions  final public 
+
+int DeleteTuples(String tblName , HashSet<HashMap<String,String>> result) throws ParseException {int count = 0 ;
+String ColDefStr = myDB.getDB(tblName + " @column definition").elementAt(0);
+
+     Vector <String> colDefVector_with_tblName = new Vector<String>();
+     Vector <String> colDefVector = new Vector<String>();
+     Vector<String> tuples = myDB.getDB(tblName+ " @tuple");
+
+     StringTokenizer st2 = new StringTokenizer(ColDefStr, delim);
+      // Get columns of referenced table
+     while (st2.hasMoreTokens())
+          {
+            String colName = st2.nextToken();
+            String colType = st2.nextToken();
+            colDefVector_with_tblName.addElement(tblName+"."+colName);
+            colDefVector.addElement(colName);
+          }
+
+    for(HashMap<String,String> result_tuple : result ){
+
+        for( int i = 0 ; i < tuples.size() ; i++ ){
+
+            boolean deleteThis = true;
+            for( int j = 0 ; j < colDefVector.size() ; j ++ ){
+                 String value = GetColumnValue(tuples.elementAt(i), colDefVector.elementAt(j));
+                 String value_result = result_tuple.get(colDefVector_with_tblName.elementAt(j));
+                if(!value.equals(value_result)){
+                    deleteThis = false;
+                }
+            }
+
+            if(deleteThis){
+            count++; myDB.deleteTupleDB(tblName+ " @tuple",tuples.elementAt(i)); }
+        }
+    }
+    {if ("" != null) return count;}
+    throw new Error("Missing return statement in function");
+  }
+
+  final public void CheckAndModifyAliasVector(Vector<String> alias_vector) throws ParseException {String colName = "" ; String[] columnInfo; String tblName;
+if(alias_vector.size() == 0){ // then select * must be called.
+        alias_vector.addAll(tblcol_table.keySet());
+          for( int i = 0 ; i < alias_vector.size() ; i ++ )
+          { String alias = alias_vector.elementAt(i);
+            selectedColumn_table.put(alias,alias);
+           }
+      }
+
+       for( int i = 0 ; i < alias_vector.size() ; i ++ ){
+
+        String colName_str = selectedColumn_table.get(alias_vector.elementAt(i));
+        columnInfo = colName_str.split("\u005c\u005c.");
+        if(columnInfo.length == 2){ // tblName.colName과 col Name을 구분한다.
+           tblName = columnInfo[0];
+           colName  = columnInfo[1];
+
+           if( CheckNoSuchTable(tblName) // tblName이 from 절에 나오는 alias인 경우에도, 올바른 경우이므로 이 경우에 에러를 던지지 않기 위해서 이 부분이 필요
+            && !alias_table.containsKey(tblName)){SelectTableExistenceError(tblName); }
+
+           Set<String> keySet = tblcol_table.keySet(); // tuple의 key 값 중에 하나인가?
+           if(!keySet.contains(colName_str)){ SelectColumnResolveError(colName);}
+
+        } else {
+           String operand = colName_str;
+           if(!tblname_table.containsKey(operand)){ SelectColumnResolveError(colName_str);}
+           else if (tblname_table.get(operand).equals("@duplication"))
+           { SelectColumnResolveError(colName_str); }
+             selectedColumn_table.put(alias_vector.elementAt(i),  tblname_table.get(operand)+"."+operand);
+        }
+      }
+  }
+
+  final public HashSet<HashMap<String,String>> FilterTuples(String operand1, String operand2, String operator) throws ParseException {HashSet<HashMap<String,String>> result = new HashSet<HashMap<String,String>>();
+ String value1 ="" ; String dataType1 ="";
+ String value2 ="" ; String dataType2 ="";
+ Integer value1_int = 0 ;
+ Integer value2_int = 0;
+ boolean value1IsAttribute= true;
+ boolean value2IsAttribute= true ;
+ int comparation = 0 ;
+Set<String> keySet = tblcol_table.keySet();
+      if(!keySet.contains(operand1))
+      { value1IsAttribute = false;
+        value1 = operand1.substring(1);
+        dataType1 = operand1.substring(0,1);
+      } else { dataType1 = tblcol_table.get(operand1).substring(0,1);}
+
+      if(!keySet.contains(operand2))
+      { value2IsAttribute = false;
+        value2 = operand2.substring(1);
+        dataType2 = operand2.substring(0,1);
+      } else { dataType2 = tblcol_table.get(operand2).substring(0,1);}
 
 
+     if(!dataType1.equals(dataType2)){ WhereIncomparableError(); }
+     else {
+        for(HashMap<String,String> tuple : tuple_space){
+            if(value1IsAttribute){ value1 = tuple.get(operand1); }
+            if(value2IsAttribute){ value2 = tuple.get(operand2); }
 
+              if( dataType1.equals("i") ){
+                value1_int = Integer.parseInt(value1);
+                value2_int = Integer.parseInt(value2);
+                comparation = value1_int.compareTo(value2_int);
+               } else { comparation = value1.compareTo(value2); }
 
+            switch(operator){
+               case "<" : { if(comparation<0) result.add(tuple); break; }
+               case ">" : { if(comparation>0) result.add(tuple); break; }
+               case "=" :{ if(comparation == 0 )  result.add(tuple); break; }
+               case ">=" :{ if(comparation>=0) result.add(tuple); break; }
+               case "<=" :{ if(comparation <= 0 ) result.add(tuple); break; }
+               case "!=" :{ if(comparation!= 0) result.add(tuple); break; }
+            }
+         }
+       }
+     {if ("" != null) return result;}
+    throw new Error("Missing return statement in function");
+  }
 
-void ExtendTableHash(String alias) throws ParseException {
+  final public void ExtendTableHash(String alias) throws ParseException {
 String tblName = alias_table.get(alias);
           String ColDefStr = myDB.getDB(tblName + " @column definition").elementAt(0);
           StringTokenizer st2 = new StringTokenizer(ColDefStr, delim);
@@ -714,6 +857,7 @@ String tblName = alias_table.get(alias);
                       {
                         String colName = st2.nextToken();
                         String colType = st2.nextToken();
+                        tblcol_table.put(alias+"."+colName, colType);
                         if(tblname_table.containsKey(colName)){
                                  tblname_table.put(colName,"@duplication");
                         } else { tblname_table.put(colName,alias); }
@@ -735,7 +879,6 @@ if(tuple_space.size() == 0 ){
               String colType = st2.nextToken();
               colDefVector_alias.addElement(alias+"."+colName);
               colDefVector.addElement(colName);
-
             }
 
       Vector<String> tuples = myDB.getDB(tblName+ " @tuple");
@@ -752,6 +895,7 @@ if(tuple_space.size() == 0 ){
        }
     }
     else {
+            HashSet<HashMap<String,String>> newTupleSet =new HashSet<HashMap<String,String>> ();
 
             for(HashMap<String,String> tuple : tuple_space){
 
@@ -759,6 +903,7 @@ if(tuple_space.size() == 0 ){
                       String ColDefStr = myDB.getDB(tblName + " @column definition").elementAt(0);
                       Vector <String> colDefVector_alias = new Vector<String>();
                       Vector <String> colDefVector = new Vector<String>();
+
                       StringTokenizer st2 = new StringTokenizer(ColDefStr, delim);
                             // Get columns of referenced table
                             while (st2.hasMoreTokens())
@@ -772,13 +917,18 @@ if(tuple_space.size() == 0 ){
                       Vector<String> tuples = myDB.getDB(tblName+ " @tuple");
 
                        for(int i = 0 ; i < tuples.size() ; i++){
+                             HashMap<String,String> tuple_extended = (HashMap<String,String> ) tuple.clone();
+
                              for(int j = 0 ; j <colDefVector.size() ; j++ ){
                                 String colName =  colDefVector.elementAt(j);
                                 String value = GetColumnValue(tuples.elementAt(i), colName);
-                                tuple.put(colDefVector_alias.elementAt(j), value);
+                                tuple_extended.put(colDefVector_alias.elementAt(j), value);
                              }
+                                  newTupleSet.add(tuple_extended);
                        }
             }
+
+            tuple_space = newTupleSet;
     }
   }
 
@@ -905,6 +1055,56 @@ myDB.deleteTable(tblName);
     {
       myDB.putDB("@table name", tblNameList.elementAt(i));
     }
+  }
+
+  final public void ShowTuples(Vector<String>alias_vector,  HashSet<HashMap<String,String>> result) throws ParseException {String line = "";
+ String lineformat = "";
+ String format = "";
+ String field_name_format = "";
+for(int j = 0 ; j <  26 ; j ++){
+            line += "-";
+        } // generate lines.
+        for( int i = 0 ; i < alias_vector.size() ; i++ ){
+                    lineformat += "%-26s+"  ;
+        } // generate line format
+        String[] lines = new String[alias_vector.size()]; // generate lines array.
+        for( int i = 0 ; i < alias_vector.size() ; i++ ){
+
+             field_name_format += "  %-22s  |"  ;
+
+        } // generate field_name format
+        for( int i = 0 ; i < alias_vector.size() ; i++ ){
+                    if((i % 2) == 0)
+                    { format += "  %22s  |"  ; }
+                    else
+                    {format += "  %-22s  |"  ;}
+                    lines[i] = line;
+        } // generate field format
+        String[] selectedColumnString = new String[alias_vector.size()];
+        selectedColumnString = alias_vector.toArray(selectedColumnString);
+        System.out.println(String.format(lineformat, (Object[])lines));
+        System.out.println(String.format(field_name_format, (Object[])selectedColumnString));
+        System.out.println(String.format(lineformat, (Object[])lines));
+
+
+        /* completion of Fomatting. now start showing datas from tuples */
+
+
+         for(HashMap<String,String> item : result){
+
+                Vector<String> tupleVector = new Vector<String>(alias_vector.size());
+
+                for(int k = 0 ; k < alias_vector.size() ; k ++ ){
+                    String realAttributeName = selectedColumn_table.get(alias_vector.elementAt(k));
+                    String value = item.get(realAttributeName);
+                    tupleVector.add(k,value);
+                }
+
+               String[] tupleResult = new String[tupleVector.size()];
+               tupleResult = tupleVector.toArray(tupleResult);
+               System.out.println(String.format(format, (Object[])tupleResult));
+               System.out.println(String.format(lineformat, (Object[])lines));
+         }
   }
 
 // Perform show tables query  final public void ShowTables() throws ParseException {
@@ -1118,8 +1318,7 @@ Success(i);
 
   final public int ExitQuery() throws ParseException {
     jj_consume_token(EXIT);
-String result = myDB.getDB("account @primary key").elementAt(0);
-    System.out.println(result);
+System.out.println("tblname_table: "+tblname_table.toString());
     {if ("" != null) return - 1;}
     throw new Error("Missing return statement in function");
   }
@@ -1471,24 +1670,31 @@ if (CheckNoSuchTable(tblName))
     throw new Error("Missing return statement in function");
   }
 
-  final public int SelectQuery() throws ParseException {
+  final public int SelectQuery() throws ParseException {Vector<String> alias_vector = new Vector<String>();
+  HashSet<HashMap<String,String>> result ;
+  tblcol_table = new Hashtable<String,String>(); // <K,V> = <alias.colName, type>
     jj_consume_token(SELECT);
-    SelectList();
-    TableExpression();
-System.out.println(tblname_table.toString());
+    SelectList(alias_vector);
+    result = TableExpression();
+CheckAndModifyAliasVector(alias_vector);
+
+    if(result.size() != 0)
+    { ShowTuples(alias_vector, result); }
+    else { System.out.println("Empty set");}
     {if ("" != null) return 4;}
     throw new Error("Missing return statement in function");
   }
 
-  final public void SelectList() throws ParseException {
+  final public void SelectList(Vector<String> alias_vector) throws ParseException {selectedColumn_table = new Hashtable<String,String>();
     switch ((jj_ntk==-1)?jj_ntk_f():jj_ntk) {
     case 3:{
       jj_consume_token(3);
+
       break;
       }
     case ALPHABET:
     case LEGAL_IDENTIFIER:{
-      SelectedColumn();
+      SelectedColumn(alias_vector);
       label_5:
       while (true) {
         switch ((jj_ntk==-1)?jj_ntk_f():jj_ntk) {
@@ -1501,7 +1707,7 @@ System.out.println(tblname_table.toString());
           break label_5;
         }
         jj_consume_token(COMMA);
-        SelectedColumn();
+        SelectedColumn(alias_vector);
       }
       break;
       }
@@ -1512,18 +1718,23 @@ System.out.println(tblname_table.toString());
     }
   }
 
-  final public void SelectedColumn() throws ParseException {
+  final public void SelectedColumn(Vector<String> alias_vector) throws ParseException {String alias = "";
     if (jj_2_2(2147483647)) {
-      SelectedColumnAux1();
+      alias = SelectedColumnAux1();
+alias_vector.add(alias);
     } else if (jj_2_3(2147483647)) {
-      SelectedColumnAux2();
+      alias = SelectedColumnAux2();
+alias_vector.add(alias);
     } else if (jj_2_4(2147483647)) {
-      SelectedColumnAux3();
+      alias = SelectedColumnAux3();
+alias_vector.add(alias);
     } else {
       switch ((jj_ntk==-1)?jj_ntk_f():jj_ntk) {
       case ALPHABET:
       case LEGAL_IDENTIFIER:{
-        ColumnName();
+        alias = ColumnName();
+selectedColumn_table.put(alias,alias);
+    alias_vector.add(alias);
         break;
         }
       default:
@@ -1534,34 +1745,47 @@ System.out.println(tblname_table.toString());
     }
   }
 
-  final public void SelectedColumnAux1() throws ParseException {
-    TableName();
+  final public String SelectedColumnAux1() throws ParseException {String tblName = "";
+   String colName = "" ; String alias ="";
+    tblName = TableName();
     jj_consume_token(PERIOD);
-    ColumnName();
+    colName = ColumnName();
     jj_consume_token(AS);
-    ColumnName();
+    alias = ColumnName();
+selectedColumn_table.put(alias,tblName+"."+colName);
+         {if ("" != null) return alias;}
+    throw new Error("Missing return statement in function");
   }
 
-  final public void SelectedColumnAux2() throws ParseException {
-    TableName();
+  final public String SelectedColumnAux2() throws ParseException {String tblName = "";
+  String colName = "" ; String alias ="";
+    tblName = TableName();
     jj_consume_token(PERIOD);
-    ColumnName();
+    colName = ColumnName();
+alias = tblName+"."+colName;
+    selectedColumn_table.put(alias,alias);
+    {if ("" != null) return alias;}
+    throw new Error("Missing return statement in function");
   }
 
-  final public void SelectedColumnAux3() throws ParseException {
-    ColumnName();
+  final public String SelectedColumnAux3() throws ParseException {String colName = "" ; String alias ="";
+    colName = ColumnName();
     jj_consume_token(AS);
-    ColumnName();
+    alias = ColumnName();
+selectedColumn_table.put(alias,colName); {if ("" != null) return alias ;}
+    throw new Error("Missing return statement in function");
   }
 
-  final public void TableExpression() throws ParseException {
+  final public HashSet<HashMap<String,String>> TableExpression() throws ParseException {HashSet<HashMap<String,String>> result = new  HashSet<HashMap<String,String>>();
     if (jj_2_5(2147483647)) {
       FromClause();
-      WhereClause();
+      result = WhereClause();
+{if ("" != null) return result;}
     } else {
       switch ((jj_ntk==-1)?jj_ntk_f():jj_ntk) {
       case FROM:{
         FromClause();
+{if ("" != null) return tuple_space;}
         break;
         }
       default:
@@ -1570,6 +1794,7 @@ System.out.println(tblname_table.toString());
         throw new ParseException();
       }
     }
+    throw new Error("Missing return statement in function");
   }
 
   final public void FromClause() throws ParseException {alias_table = new Hashtable<String,String>();
@@ -1638,13 +1863,19 @@ if (CheckNoSuchTable(tblName))
     throw new Error("Missing return statement in function");
   }
 
-  final public void WhereClause() throws ParseException {
+  final public HashSet<HashMap<String,String>> WhereClause() throws ParseException {HashSet<HashMap<String,String>> result = new HashSet<HashMap<String,String>>();
     jj_consume_token(WHERE);
-    BooleanValueExpression();
+    result = BooleanValueExpression();
+{if ("" != null) return result;}
+    throw new Error("Missing return statement in function");
   }
 
-  final public void BooleanValueExpression() throws ParseException {
-    BooleanTerm();
+  final public HashSet<HashMap<String,String>> BooleanValueExpression() throws ParseException {HashSet<HashMap<String,String>> result
+
+ = new HashSet<HashMap<String,String>>();
+     HashSet<HashMap<String,String>> tmp = new HashSet<HashMap<String,String>>();
+    result = BooleanTerm();
+
     label_7:
     while (true) {
       switch ((jj_ntk==-1)?jj_ntk_f():jj_ntk) {
@@ -1657,12 +1888,17 @@ if (CheckNoSuchTable(tblName))
         break label_7;
       }
       jj_consume_token(OR);
-      BooleanTerm();
+      tmp = BooleanTerm();
+result.addAll(tmp);
     }
+{if ("" != null) return result;}
+    throw new Error("Missing return statement in function");
   }
 
-  final public void BooleanTerm() throws ParseException {
-    BooleanFactor();
+  final public HashSet<HashMap<String,String>> BooleanTerm() throws ParseException {HashSet<HashMap<String,String>> result = new HashSet<HashMap<String,String>>();
+   HashSet<HashMap<String,String>> tmp = new HashSet<HashMap<String,String>>();
+    result = BooleanFactor();
+
     label_8:
     while (true) {
       switch ((jj_ntk==-1)?jj_ntk_f():jj_ntk) {
@@ -1675,11 +1911,16 @@ if (CheckNoSuchTable(tblName))
         break label_8;
       }
       jj_consume_token(AND);
-      BooleanFactor();
+      tmp = BooleanFactor();
+result.retainAll(tmp); /* return result ; */
+
     }
+{if ("" != null) return result;}
+    throw new Error("Missing return statement in function");
   }
 
-  final public void BooleanFactor() throws ParseException {
+  final public HashSet<HashMap<String,String>> BooleanFactor() throws ParseException {HashSet<HashMap<String,String>> temp = new HashSet<HashMap<String,String>>();
+HashSet<HashMap<String,String>> result = new HashSet<HashMap<String,String>>();
     switch ((jj_ntk==-1)?jj_ntk_f():jj_ntk) {
     case LEFT_PAREN:
     case DIGIT:
@@ -1688,12 +1929,14 @@ if (CheckNoSuchTable(tblName))
     case INT_VALUE:
     case DATE_VALUE:
     case CHAR_STRING:{
-      BooleanTest();
+      result = BooleanTest();
+{if ("" != null) return result;}
       break;
       }
     case NOT:{
       jj_consume_token(NOT);
-      BooleanTest();
+      temp = BooleanTest();
+result.addAll(tuple_space); result.removeAll(temp);{if ("" != null) return result;}
       break;
       }
     default:
@@ -1701,9 +1944,10 @@ if (CheckNoSuchTable(tblName))
       jj_consume_token(-1);
       throw new ParseException();
     }
+    throw new Error("Missing return statement in function");
   }
 
-  final public void BooleanTest() throws ParseException {
+  final public HashSet<HashMap<String,String>> BooleanTest() throws ParseException {HashSet<HashMap<String,String>> result = new HashSet<HashMap<String,String>>();
     switch ((jj_ntk==-1)?jj_ntk_f():jj_ntk) {
     case DIGIT:
     case ALPHABET:
@@ -1711,11 +1955,13 @@ if (CheckNoSuchTable(tblName))
     case INT_VALUE:
     case DATE_VALUE:
     case CHAR_STRING:{
-      Predicate();
+      result = Predicate();
+{if ("" != null) return result;}
       break;
       }
     case LEFT_PAREN:{
-      ParentehsizedBooleanExpression();
+      result = ParentehsizedBooleanExpression();
+{if ("" != null) return result;}
       break;
       }
     default:
@@ -1723,22 +1969,27 @@ if (CheckNoSuchTable(tblName))
       jj_consume_token(-1);
       throw new ParseException();
     }
+    throw new Error("Missing return statement in function");
   }
 
-  final public void ParentehsizedBooleanExpression() throws ParseException {
+  final public HashSet<HashMap<String,String>> ParentehsizedBooleanExpression() throws ParseException {HashSet<HashMap<String,String>> result = new HashSet<HashMap<String,String>>();
     jj_consume_token(LEFT_PAREN);
-    BooleanValueExpression();
+    result = BooleanValueExpression();
     jj_consume_token(RIGHT_PAREN);
+{if ("" != null) return result;}
+    throw new Error("Missing return statement in function");
   }
 
-  final public void Predicate() throws ParseException {
+  final public HashSet<HashMap<String,String>> Predicate() throws ParseException {HashSet<HashMap<String,String>> result = new HashSet<HashMap<String,String>>();
     if (jj_2_7(2147483647)) {
-      ComparisonPredicate();
+      result = ComparisonPredicate();
+{if ("" != null) return result ;}
     } else {
       switch ((jj_ntk==-1)?jj_ntk_f():jj_ntk) {
       case ALPHABET:
       case LEGAL_IDENTIFIER:{
-        NullPredicate();
+        result = NullPredicate();
+{if ("" != null) return result;}
         break;
         }
       default:
@@ -1747,34 +1998,44 @@ if (CheckNoSuchTable(tblName))
         throw new ParseException();
       }
     }
+    throw new Error("Missing return statement in function");
   }
 
-  final public void ComparisonPredicate() throws ParseException {String operand = "";
+  final public HashSet<HashMap<String,String>> ComparisonPredicate() throws ParseException {String operand1 = "";
+  String operand2 = "";
   Token operator;
   String operator_str ="";
-    operand = CompOperand();
+  HashSet<HashMap<String,String>> result =  new HashSet<HashMap<String,String>>();
+    operand1 = CompOperand();
     operator = jj_consume_token(COMP_OP);
 operator_str = operator.image;
-    CompOperand();
+    operand2 = CompOperand();
+result = FilterTuples(operand1, operand2, operator_str);
+      {if ("" != null) return result;}
+    throw new Error("Missing return statement in function");
   }
 
   final public String CompOperand() throws ParseException {String operand = "";
     if (jj_2_8(2147483647)) {
       operand = CompOperandAux();
-{if ("" != null) return operand;}
+Set<String> keySet = tblcol_table.keySet();
+     if(!keySet.contains(operand)){ WhereColumnNotExistError(); }
+     {if ("" != null) return operand;}
     } else {
       switch ((jj_ntk==-1)?jj_ntk_f():jj_ntk) {
       case ALPHABET:
       case LEGAL_IDENTIFIER:{
         operand = ColumnName();
-{if ("" != null) return operand;}
+if(! tblname_table.containsKey(operand)) { WhereColumnNotExistError(); }
+    else if (tblname_table.get(operand).equals("@duplication")){ WhereAmbiguousReferenceError(); }
+    {if ("" != null) return tblname_table.get(operand)+"."+operand;}
         break;
         }
       case DIGIT:
       case INT_VALUE:
       case DATE_VALUE:
       case CHAR_STRING:{
-        operand = ComparableValue();
+        operand = ComparableValue_inWhereClause();
 {if ("" != null) return operand;}
         break;
         }
@@ -1793,8 +2054,42 @@ operator_str = operator.image;
     TblName = TableName();
     jj_consume_token(PERIOD);
     ColName = ColumnName();
-result = TblName+"."+ColName;
+if  (!alias_table.containsKey(TblName))
+        {
+         WhereTableNotSpecifiedError(); // talbe이 alias table 에 존재하는 지 본다 (alias가 없는 경우 자신의 이름으로 aliastable에 들어가 있다)
+        }
+   result = TblName+"."+ColName;
    {if ("" != null) return result;}
+    throw new Error("Missing return statement in function");
+  }
+
+  final public String ComparableValue_inWhereClause() throws ParseException {Token t;
+    switch ((jj_ntk==-1)?jj_ntk_f():jj_ntk) {
+    case DATE_VALUE:{
+      t = jj_consume_token(DATE_VALUE);
+{if ("" != null) return "d"+t.image.toLowerCase();}
+      break;
+      }
+    case INT_VALUE:{
+      t = jj_consume_token(INT_VALUE);
+{if ("" != null) return "i"+t.image.toLowerCase();}
+      break;
+      }
+    case DIGIT:{
+      t = jj_consume_token(DIGIT);
+{if ("" != null) return "i"+t.image.toLowerCase();}
+      break;
+      }
+    case CHAR_STRING:{
+      t = jj_consume_token(CHAR_STRING);
+{if ("" != null) return "c"+t.image.toLowerCase();}
+      break;
+      }
+    default:
+      jj_la1[26] = jj_gen;
+      jj_consume_token(-1);
+      throw new ParseException();
+    }
     throw new Error("Missing return statement in function");
   }
 
@@ -1821,34 +2116,40 @@ result = TblName+"."+ColName;
       break;
       }
     default:
-      jj_la1[26] = jj_gen;
+      jj_la1[27] = jj_gen;
       jj_consume_token(-1);
       throw new ParseException();
     }
     throw new Error("Missing return statement in function");
   }
 
-  final public void NullPredicate() throws ParseException {HashSet<HashMap<String,String>> tuple_set_result;
+  final public HashSet<HashMap<String,String>> NullPredicate() throws ParseException {HashSet<HashMap<String,String>> tuple_set_result = new HashSet<HashMap<String,String>> ();
 String operand = ""; String condition ="";
     if (jj_2_9(2147483647)) {
       operand = NullPredicateAux();
+Set<String> keySet = tblcol_table.keySet();
+                                   if(!keySet.contains(operand)){ WhereColumnNotExistError(); }
       tuple_set_result = NullOperation(operand);
-System.out.println(tuple_set_result.toString());
+{if ("" != null) return tuple_set_result;}
     } else {
       switch ((jj_ntk==-1)?jj_ntk_f():jj_ntk) {
       case ALPHABET:
       case LEGAL_IDENTIFIER:{
         operand = ColumnName();
+if(! tblname_table.containsKey(operand)) { WhereColumnNotExistError(); }
+                                else if (tblname_table.get(operand).equals("@duplication")){ WhereAmbiguousReferenceError(); }
+                                operand = tblname_table.get(operand)+"."+operand;
         tuple_set_result = NullOperation(operand);
-System.out.println(tuple_set_result.toString());
+{if ("" != null) return tuple_set_result;}
         break;
         }
       default:
-        jj_la1[27] = jj_gen;
+        jj_la1[28] = jj_gen;
         jj_consume_token(-1);
         throw new ParseException();
       }
     }
+    throw new Error("Missing return statement in function");
   }
 
   final public String NullPredicateAux() throws ParseException {String result = "";
@@ -1889,7 +2190,7 @@ for(HashMap<String,String> item : tuple_space){
       break;
       }
     default:
-      jj_la1[28] = jj_gen;
+      jj_la1[29] = jj_gen;
       jj_consume_token(-1);
       throw new ParseException();
     }
@@ -1944,7 +2245,7 @@ myDB.deleteDB(tblName+" @tmptuple"); // 에러가 났을 경우 아직도 남아
       break;
       }
     default:
-      jj_la1[29] = jj_gen;
+      jj_la1[30] = jj_gen;
       ;
     }
     ValueList();
@@ -1965,7 +2266,7 @@ myDB.deleteDB(tblName+" @tmptuple"); // 에러가 났을 경우 아직도 남아
         break;
         }
       default:
-        jj_la1[30] = jj_gen;
+        jj_la1[31] = jj_gen;
         break label_9;
       }
       jj_consume_token(COMMA);
@@ -1994,7 +2295,7 @@ myDB.deleteDB(tblName+" @tmptuple"); // 에러가 났을 경우 아직도 남아
       break;
       }
     default:
-      jj_la1[31] = jj_gen;
+      jj_la1[32] = jj_gen;
       jj_consume_token(-1);
       throw new ParseException();
     }
@@ -2002,18 +2303,38 @@ myDB.deleteDB(tblName+" @tmptuple"); // 에러가 났을 경우 아직도 남아
   }
 
   final public int DeleteQuery() throws ParseException {String tblName;
+
+    Vector<String> alias_vector = new Vector<String>();
+    HashSet<HashMap<String,String>> result ;
+    tblcol_table = new Hashtable<String,String>(); // <K,V> = <alias.colName, type>    alias_table = new Hashtable<String,String>();
+    tuple_space =new HashSet<HashMap<String,String>> ();
+    tblname_table = new Hashtable<String,String>();
+    tblcol_table = new Hashtable<String,String>();
     jj_consume_token(DELETE_FROM);
     tblName = TableName();
+alias_table.put(tblName,tblName);
+    ExtendTupleSpace(tblName);
+    ExtendTableHash(tblName);
+    result = tuple_space;
     switch ((jj_ntk==-1)?jj_ntk_f():jj_ntk) {
     case WHERE:{
-      WhereClause();
+      result = WhereClause();
       break;
       }
     default:
-      jj_la1[32] = jj_gen;
+      jj_la1[33] = jj_gen;
       ;
     }
-{if ("" != null) return 6;}
+if (CheckNoSuchTable(tblName))
+            {
+              NoSuchTable();
+            }
+
+    int count = DeleteTuples(tblName,result);
+    System.out.println(count+" rows are deleted");
+
+    System.out.println(result.toString());
+    {if ("" != null) return 6;}
     throw new Error("Missing return statement in function");
   }
 
@@ -2031,7 +2352,7 @@ switch (i)
       case 1 :
       DropSuccess();
       break;
-      case 4 : System.out.println("select requested");
+      case 4 :
       break;
       case 5 : System.out.println("insert requested");
       break;
@@ -2044,7 +2365,7 @@ switch (i)
   }
 
   final public void Start() throws ParseException {Token t;
-System.out.print("SQL_2011-11693 > ");
+System.out.print("DB_2014-16962 > ");
     label_10:
     while (true) {
       switch ((jj_ntk==-1)?jj_ntk_f():jj_ntk) {
@@ -2060,7 +2381,7 @@ System.out.print("SQL_2011-11693 > ");
         break;
         }
       default:
-        jj_la1[33] = jj_gen;
+        jj_la1[34] = jj_gen;
         break label_10;
       }
       Command();
@@ -2142,147 +2463,9 @@ System.out.println("Syntax error");
     finally { jj_save(8, xla); }
   }
 
-  private boolean jj_3R_43()
+  private boolean jj_3R_60()
  {
-    if (jj_scan_token(NOT)) return true;
-    if (jj_3R_48()) return true;
-    return false;
-  }
-
-  private boolean jj_3_4()
- {
-    if (jj_3R_15()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_42()
- {
-    if (jj_3R_48()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_39()
- {
-    Token xsp;
-    xsp = jj_scanpos;
-    if (jj_3R_42()) {
-    jj_scanpos = xsp;
-    if (jj_3R_43()) return true;
-    }
-    return false;
-  }
-
-  private boolean jj_3R_13()
- {
-    if (jj_3R_18()) return true;
-    if (jj_scan_token(PERIOD)) return true;
-    if (jj_3R_11()) return true;
-    if (jj_scan_token(AS)) return true;
-    if (jj_3R_11()) return true;
-    return false;
-  }
-
-  private boolean jj_3_3()
- {
-    if (jj_3R_14()) return true;
-    return false;
-  }
-
-  private boolean jj_3_2()
- {
-    if (jj_3R_13()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_21()
- {
-    if (jj_3R_18()) return true;
-    if (jj_scan_token(PERIOD)) return true;
-    if (jj_3R_11()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_40()
- {
-    if (jj_scan_token(AND)) return true;
-    if (jj_3R_39()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_32()
- {
-    if (jj_3R_39()) return true;
-    Token xsp;
-    while (true) {
-      xsp = jj_scanpos;
-      if (jj_3R_40()) { jj_scanpos = xsp; break; }
-    }
-    return false;
-  }
-
-  private boolean jj_3_9()
- {
-    if (jj_3R_21()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_33()
- {
-    if (jj_scan_token(OR)) return true;
-    if (jj_3R_32()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_22()
- {
-    if (jj_scan_token(LEGAL_IDENTIFIER)) return true;
-    return false;
-  }
-
-  private boolean jj_3R_57()
- {
-    if (jj_3R_11()) return true;
-    if (jj_3R_58()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_11()
- {
-    Token xsp;
-    xsp = jj_scanpos;
-    if (jj_3R_22()) {
-    jj_scanpos = xsp;
-    if (jj_scan_token(19)) return true;
-    }
-    return false;
-  }
-
-  private boolean jj_3R_27()
- {
-    if (jj_3R_32()) return true;
-    Token xsp;
-    while (true) {
-      xsp = jj_scanpos;
-      if (jj_3R_33()) { jj_scanpos = xsp; break; }
-    }
-    return false;
-  }
-
-  private boolean jj_3R_56()
- {
-    if (jj_3R_21()) return true;
-    if (jj_3R_58()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_55()
- {
-    Token xsp;
-    xsp = jj_scanpos;
-    if (jj_3R_56()) {
-    jj_scanpos = xsp;
-    if (jj_3R_57()) return true;
-    }
+    if (jj_scan_token(IS_NOT_NULL)) return true;
     return false;
   }
 
@@ -2293,83 +2476,9 @@ System.out.println("Syntax error");
     return false;
   }
 
-  private boolean jj_3R_47()
+  private boolean jj_3R_36()
  {
-    if (jj_scan_token(CHAR_STRING)) return true;
-    return false;
-  }
-
-  private boolean jj_3R_46()
- {
-    if (jj_scan_token(DIGIT)) return true;
-    return false;
-  }
-
-  private boolean jj_3R_45()
- {
-    if (jj_scan_token(INT_VALUE)) return true;
-    return false;
-  }
-
-  private boolean jj_3R_44()
- {
-    if (jj_scan_token(DATE_VALUE)) return true;
-    return false;
-  }
-
-  private boolean jj_3R_41()
- {
-    Token xsp;
-    xsp = jj_scanpos;
-    if (jj_3R_44()) {
-    jj_scanpos = xsp;
-    if (jj_3R_45()) {
-    jj_scanpos = xsp;
-    if (jj_3R_46()) {
-    jj_scanpos = xsp;
-    if (jj_3R_47()) return true;
-    }
-    }
-    }
-    return false;
-  }
-
-  private boolean jj_3R_28()
- {
-    if (jj_scan_token(LEGAL_IDENTIFIER)) return true;
-    return false;
-  }
-
-  private boolean jj_3R_38()
- {
-    if (jj_3R_18()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_18()
- {
-    Token xsp;
-    xsp = jj_scanpos;
-    if (jj_3R_28()) {
-    jj_scanpos = xsp;
-    if (jj_scan_token(19)) return true;
-    }
-    return false;
-  }
-
-  private boolean jj_3_6()
- {
-    if (jj_3R_18()) return true;
-    if (jj_scan_token(AS)) return true;
-    if (jj_3R_18()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_20()
- {
-    if (jj_3R_18()) return true;
-    if (jj_scan_token(PERIOD)) return true;
-    if (jj_3R_11()) return true;
+    if (jj_3R_41()) return true;
     return false;
   }
 
@@ -2379,34 +2488,20 @@ System.out.println("Syntax error");
     return false;
   }
 
-  private boolean jj_3R_25()
+  private boolean jj_3R_59()
  {
-    if (jj_scan_token(DATE)) return true;
+    if (jj_scan_token(IS_NULL)) return true;
     return false;
   }
 
-  private boolean jj_3R_37()
- {
-    if (jj_3R_18()) return true;
-    if (jj_scan_token(AS)) return true;
-    if (jj_3R_18()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_30()
+  private boolean jj_3R_58()
  {
     Token xsp;
     xsp = jj_scanpos;
-    if (jj_3R_37()) {
+    if (jj_3R_59()) {
     jj_scanpos = xsp;
-    if (jj_3R_38()) return true;
+    if (jj_3R_60()) return true;
     }
-    return false;
-  }
-
-  private boolean jj_3R_36()
- {
-    if (jj_3R_41()) return true;
     return false;
   }
 
@@ -2416,10 +2511,15 @@ System.out.println("Syntax error");
     return false;
   }
 
-  private boolean jj_3R_31()
+  private boolean jj_3R_22()
  {
-    if (jj_scan_token(COMMA)) return true;
-    if (jj_3R_30()) return true;
+    if (jj_scan_token(LEGAL_IDENTIFIER)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_38()
+ {
+    if (jj_3R_18()) return true;
     return false;
   }
 
@@ -2443,28 +2543,49 @@ System.out.println("Syntax error");
     return false;
   }
 
-  private boolean jj_3R_26()
+  private boolean jj_3R_11()
  {
-    if (jj_3R_30()) return true;
     Token xsp;
-    while (true) {
-      xsp = jj_scanpos;
-      if (jj_3R_31()) { jj_scanpos = xsp; break; }
+    xsp = jj_scanpos;
+    if (jj_3R_22()) {
+    jj_scanpos = xsp;
+    if (jj_scan_token(19)) return true;
     }
     return false;
   }
 
-  private boolean jj_3R_24()
+  private boolean jj_3_6()
  {
-    if (jj_scan_token(CHAR)) return true;
-    if (jj_scan_token(LEFT_PAREN)) return true;
+    if (jj_3R_18()) return true;
+    if (jj_scan_token(AS)) return true;
+    if (jj_3R_18()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_21()
+ {
+    if (jj_3R_18()) return true;
+    if (jj_scan_token(PERIOD)) return true;
+    if (jj_3R_11()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_37()
+ {
+    if (jj_3R_18()) return true;
+    if (jj_scan_token(AS)) return true;
+    if (jj_3R_18()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_30()
+ {
     Token xsp;
     xsp = jj_scanpos;
-    if (jj_scan_token(48)) {
+    if (jj_3R_37()) {
     jj_scanpos = xsp;
-    if (jj_scan_token(15)) return true;
+    if (jj_3R_38()) return true;
     }
-    if (jj_scan_token(RIGHT_PAREN)) return true;
     return false;
   }
 
@@ -2482,51 +2603,57 @@ System.out.println("Syntax error");
     return false;
   }
 
-  private boolean jj_3R_12()
+  private boolean jj_3R_31()
+ {
+    if (jj_scan_token(COMMA)) return true;
+    if (jj_3R_30()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_28()
+ {
+    if (jj_scan_token(LEGAL_IDENTIFIER)) return true;
+    return false;
+  }
+
+  private boolean jj_3_9()
+ {
+    if (jj_3R_21()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_57()
+ {
+    if (jj_3R_11()) return true;
+    if (jj_3R_58()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_18()
  {
     Token xsp;
     xsp = jj_scanpos;
-    if (jj_3R_23()) {
+    if (jj_3R_28()) {
     jj_scanpos = xsp;
-    if (jj_3R_24()) {
-    jj_scanpos = xsp;
-    if (jj_3R_25()) return true;
-    }
+    if (jj_scan_token(19)) return true;
     }
     return false;
   }
 
-  private boolean jj_3R_23()
+  private boolean jj_3R_26()
  {
-    if (jj_scan_token(INT)) return true;
-    return false;
-  }
-
-  private boolean jj_3R_16()
- {
-    if (jj_scan_token(FROM)) return true;
-    if (jj_3R_26()) return true;
-    return false;
-  }
-
-  private boolean jj_3_5()
- {
-    if (jj_3R_16()) return true;
-    if (jj_3R_17()) return true;
+    if (jj_3R_30()) return true;
+    Token xsp;
+    while (true) {
+      xsp = jj_scanpos;
+      if (jj_3R_31()) { jj_scanpos = xsp; break; }
+    }
     return false;
   }
 
   private boolean jj_3R_54()
  {
     if (jj_3R_55()) return true;
-    return false;
-  }
-
-  private boolean jj_3_1()
- {
-    if (jj_3R_11()) return true;
-    if (jj_3R_12()) return true;
-    if (jj_scan_token(NOT_NULL)) return true;
     return false;
   }
 
@@ -2547,9 +2674,35 @@ System.out.println("Syntax error");
     return false;
   }
 
-  private boolean jj_3R_60()
+  private boolean jj_3R_16()
  {
-    if (jj_scan_token(IS_NOT_NULL)) return true;
+    if (jj_scan_token(FROM)) return true;
+    if (jj_3R_26()) return true;
+    return false;
+  }
+
+  private boolean jj_3_5()
+ {
+    if (jj_3R_16()) return true;
+    if (jj_3R_17()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_56()
+ {
+    if (jj_3R_21()) return true;
+    if (jj_3R_58()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_55()
+ {
+    Token xsp;
+    xsp = jj_scanpos;
+    if (jj_3R_56()) {
+    jj_scanpos = xsp;
+    if (jj_3R_57()) return true;
+    }
     return false;
   }
 
@@ -2561,28 +2714,9 @@ System.out.println("Syntax error");
     return false;
   }
 
-  private boolean jj_3R_15()
+  private boolean jj_3R_25()
  {
-    if (jj_3R_11()) return true;
-    if (jj_scan_token(AS)) return true;
-    if (jj_3R_11()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_59()
- {
-    if (jj_scan_token(IS_NULL)) return true;
-    return false;
-  }
-
-  private boolean jj_3R_58()
- {
-    Token xsp;
-    xsp = jj_scanpos;
-    if (jj_3R_59()) {
-    jj_scanpos = xsp;
-    if (jj_3R_60()) return true;
-    }
+    if (jj_scan_token(DATE)) return true;
     return false;
   }
 
@@ -2609,11 +2743,198 @@ System.out.println("Syntax error");
     return false;
   }
 
+  private boolean jj_3R_43()
+ {
+    if (jj_scan_token(NOT)) return true;
+    if (jj_3R_48()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_24()
+ {
+    if (jj_scan_token(CHAR)) return true;
+    if (jj_scan_token(LEFT_PAREN)) return true;
+    Token xsp;
+    xsp = jj_scanpos;
+    if (jj_scan_token(48)) {
+    jj_scanpos = xsp;
+    if (jj_scan_token(15)) return true;
+    }
+    if (jj_scan_token(RIGHT_PAREN)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_42()
+ {
+    if (jj_3R_48()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_39()
+ {
+    Token xsp;
+    xsp = jj_scanpos;
+    if (jj_3R_42()) {
+    jj_scanpos = xsp;
+    if (jj_3R_43()) return true;
+    }
+    return false;
+  }
+
+  private boolean jj_3R_15()
+ {
+    if (jj_3R_11()) return true;
+    if (jj_scan_token(AS)) return true;
+    if (jj_3R_11()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_12()
+ {
+    Token xsp;
+    xsp = jj_scanpos;
+    if (jj_3R_23()) {
+    jj_scanpos = xsp;
+    if (jj_3R_24()) {
+    jj_scanpos = xsp;
+    if (jj_3R_25()) return true;
+    }
+    }
+    return false;
+  }
+
+  private boolean jj_3R_23()
+ {
+    if (jj_scan_token(INT)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_47()
+ {
+    if (jj_scan_token(CHAR_STRING)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_46()
+ {
+    if (jj_scan_token(DIGIT)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_40()
+ {
+    if (jj_scan_token(AND)) return true;
+    if (jj_3R_39()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_45()
+ {
+    if (jj_scan_token(INT_VALUE)) return true;
+    return false;
+  }
+
   private boolean jj_3R_14()
  {
     if (jj_3R_18()) return true;
     if (jj_scan_token(PERIOD)) return true;
     if (jj_3R_11()) return true;
+    return false;
+  }
+
+  private boolean jj_3_1()
+ {
+    if (jj_3R_11()) return true;
+    if (jj_3R_12()) return true;
+    if (jj_scan_token(NOT_NULL)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_44()
+ {
+    if (jj_scan_token(DATE_VALUE)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_41()
+ {
+    Token xsp;
+    xsp = jj_scanpos;
+    if (jj_3R_44()) {
+    jj_scanpos = xsp;
+    if (jj_3R_45()) {
+    jj_scanpos = xsp;
+    if (jj_3R_46()) {
+    jj_scanpos = xsp;
+    if (jj_3R_47()) return true;
+    }
+    }
+    }
+    return false;
+  }
+
+  private boolean jj_3R_32()
+ {
+    if (jj_3R_39()) return true;
+    Token xsp;
+    while (true) {
+      xsp = jj_scanpos;
+      if (jj_3R_40()) { jj_scanpos = xsp; break; }
+    }
+    return false;
+  }
+
+  private boolean jj_3R_13()
+ {
+    if (jj_3R_18()) return true;
+    if (jj_scan_token(PERIOD)) return true;
+    if (jj_3R_11()) return true;
+    if (jj_scan_token(AS)) return true;
+    if (jj_3R_11()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_33()
+ {
+    if (jj_scan_token(OR)) return true;
+    if (jj_3R_32()) return true;
+    return false;
+  }
+
+  private boolean jj_3_4()
+ {
+    if (jj_3R_15()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_27()
+ {
+    if (jj_3R_32()) return true;
+    Token xsp;
+    while (true) {
+      xsp = jj_scanpos;
+      if (jj_3R_33()) { jj_scanpos = xsp; break; }
+    }
+    return false;
+  }
+
+  private boolean jj_3_3()
+ {
+    if (jj_3R_14()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_20()
+ {
+    if (jj_3R_18()) return true;
+    if (jj_scan_token(PERIOD)) return true;
+    if (jj_3R_11()) return true;
+    return false;
+  }
+
+  private boolean jj_3_2()
+ {
+    if (jj_3R_13()) return true;
     return false;
   }
 
@@ -2628,7 +2949,7 @@ System.out.println("Syntax error");
   private Token jj_scanpos, jj_lastpos;
   private int jj_la;
   private int jj_gen;
-  final private int[] jj_la1 = new int[34];
+  final private int[] jj_la1 = new int[35];
   static private int[] jj_la1_0;
   static private int[] jj_la1_1;
   static {
@@ -2636,10 +2957,10 @@ System.out.println("Syntax error");
       jj_la1_init_1();
    }
    private static void jj_la1_init_0() {
-      jj_la1_0 = new int[] {0x6,0x106,0x80c00000,0x80c00000,0x1000,0x6080000,0x80000,0x6000000,0x1000,0x1000,0x8000,0x70000000,0x80000,0x80000,0x1000,0x80008,0x80000,0x0,0x1000,0x80000,0x0,0x0,0x88400,0x88400,0x80000,0x88000,0x8000,0x80000,0x0,0x400,0x1000,0x8000,0x0,0x80c00000,};
+      jj_la1_0 = new int[] {0x6,0x106,0x80c00000,0x80c00000,0x1000,0x6080000,0x80000,0x6000000,0x1000,0x1000,0x8000,0x70000000,0x80000,0x80000,0x1000,0x80008,0x80000,0x0,0x1000,0x80000,0x0,0x0,0x88400,0x88400,0x80000,0x88000,0x8000,0x8000,0x80000,0x0,0x400,0x1000,0x8000,0x0,0x80c00000,};
    }
    private static void jj_la1_init_1() {
-      jj_la1_1 = new int[] {0x0,0x0,0x4807,0x4807,0x0,0x8000,0x8000,0x0,0x0,0x0,0x10000,0x0,0x8000,0x8000,0x0,0x8000,0x8000,0x10,0x0,0x8000,0x80,0x40,0x78100,0x78000,0x8000,0x78000,0x70000,0x8000,0x600,0x0,0x0,0x72000,0x20,0x4807,};
+      jj_la1_1 = new int[] {0x0,0x0,0x4807,0x4807,0x0,0x8000,0x8000,0x0,0x0,0x0,0x10000,0x0,0x8000,0x8000,0x0,0x8000,0x8000,0x10,0x0,0x8000,0x80,0x40,0x78100,0x78000,0x8000,0x78000,0x70000,0x70000,0x8000,0x600,0x0,0x0,0x72000,0x20,0x4807,};
    }
   final private JJCalls[] jj_2_rtns = new JJCalls[9];
   private boolean jj_rescan = false;
@@ -2656,7 +2977,7 @@ System.out.println("Syntax error");
     token = new Token();
     jj_ntk = -1;
     jj_gen = 0;
-    for (int i = 0; i < 34; i++) jj_la1[i] = -1;
+    for (int i = 0; i < 35; i++) jj_la1[i] = -1;
     for (int i = 0; i < jj_2_rtns.length; i++) jj_2_rtns[i] = new JJCalls();
   }
 
@@ -2671,7 +2992,7 @@ System.out.println("Syntax error");
     token = new Token();
     jj_ntk = -1;
     jj_gen = 0;
-    for (int i = 0; i < 34; i++) jj_la1[i] = -1;
+    for (int i = 0; i < 35; i++) jj_la1[i] = -1;
     for (int i = 0; i < jj_2_rtns.length; i++) jj_2_rtns[i] = new JJCalls();
   }
 
@@ -2682,7 +3003,7 @@ System.out.println("Syntax error");
     token = new Token();
     jj_ntk = -1;
     jj_gen = 0;
-    for (int i = 0; i < 34; i++) jj_la1[i] = -1;
+    for (int i = 0; i < 35; i++) jj_la1[i] = -1;
     for (int i = 0; i < jj_2_rtns.length; i++) jj_2_rtns[i] = new JJCalls();
   }
 
@@ -2693,7 +3014,7 @@ System.out.println("Syntax error");
     token = new Token();
     jj_ntk = -1;
     jj_gen = 0;
-    for (int i = 0; i < 34; i++) jj_la1[i] = -1;
+    for (int i = 0; i < 35; i++) jj_la1[i] = -1;
     for (int i = 0; i < jj_2_rtns.length; i++) jj_2_rtns[i] = new JJCalls();
   }
 
@@ -2703,7 +3024,7 @@ System.out.println("Syntax error");
     token = new Token();
     jj_ntk = -1;
     jj_gen = 0;
-    for (int i = 0; i < 34; i++) jj_la1[i] = -1;
+    for (int i = 0; i < 35; i++) jj_la1[i] = -1;
     for (int i = 0; i < jj_2_rtns.length; i++) jj_2_rtns[i] = new JJCalls();
   }
 
@@ -2713,7 +3034,7 @@ System.out.println("Syntax error");
     token = new Token();
     jj_ntk = -1;
     jj_gen = 0;
-    for (int i = 0; i < 34; i++) jj_la1[i] = -1;
+    for (int i = 0; i < 35; i++) jj_la1[i] = -1;
     for (int i = 0; i < jj_2_rtns.length; i++) jj_2_rtns[i] = new JJCalls();
   }
 
@@ -2831,7 +3152,7 @@ System.out.println("Syntax error");
       la1tokens[jj_kind] = true;
       jj_kind = -1;
     }
-    for (int i = 0; i < 34; i++) {
+    for (int i = 0; i < 35; i++) {
       if (jj_la1[i] == jj_gen) {
         for (int j = 0; j < 32; j++) {
           if ((jj_la1_0[i] & (1<<j)) != 0) {
@@ -2982,6 +3303,33 @@ class myDatabase
     }
     return valueSet;
   }
+
+    public static void deleteTupleDB(String key, String value)
+    {
+      Cursor cursor = null;
+      try
+      {
+        DatabaseEntry foundKey = new DatabaseEntry();
+        DatabaseEntry foundData = new DatabaseEntry();
+        cursor = myDatabase.openCursor(null, null);
+        cursor.getFirst(foundKey, foundData, LockMode.DEFAULT);
+        do
+        {
+          String keyString = new String(foundKey.getData(), "UTF-8");
+          String dataString = new String(foundData.getData(), "UTF-8");
+
+          if(keyString.equals(key) && dataString.equals(value))
+          { cursor.delete(); }
+        }
+        while (cursor.getNext(foundKey, foundData, LockMode.DEFAULT) == OperationStatus.SUCCESS);
+      }
+      catch (Exception e)
+      {}
+      finally
+      {
+        cursor.close();
+      }
+    }
 
   public static void deleteDB(String key)
   {
